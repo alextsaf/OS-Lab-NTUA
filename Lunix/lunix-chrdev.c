@@ -4,7 +4,8 @@
  * Implementation of character devices
  * for Lunix:TNG
  *
- * < Your name here >
+ * Alexandros Tsafos - el18211
+ * Vasilis Vrettos - el18126
  *
  */
 
@@ -40,7 +41,7 @@ struct cdev lunix_chrdev_cdev;
 static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *state)
 {
 	struct lunix_sensor_struct *sensor;
-	
+
 	WARN_ON ( !(sensor = state->sensor));
 	/* ? */
 
@@ -56,7 +57,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 {
 	struct lunix_sensor_struct *sensor;
-	
+
 	debug("leaving\n");
 
 	/*
@@ -102,7 +103,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	 * Associate this open file with the relevant sensor based on
 	 * the minor number of the device node [/dev/sensor<NO>-<TYPE>]
 	 */
-	
+
 	/* Allocate a new Lunix character device private state structure */
 	/* ? */
 out:
@@ -151,7 +152,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 
 	/* End of file */
 	/* ? */
-	
+
 	/* Determine the number of cached bytes to copy to userspace */
 	/* ? */
 
@@ -167,7 +168,7 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 	return -EINVAL;
 }
 
-static struct file_operations lunix_chrdev_fops = 
+static struct file_operations lunix_chrdev_fops =
 {
         .owner          = THIS_MODULE,
 	.open           = lunix_chrdev_open,
@@ -187,18 +188,18 @@ int lunix_chrdev_init(void)
 	int ret;
 	dev_t dev_no;
 	unsigned int lunix_minor_cnt = lunix_sensor_cnt << 3;
-	
+
 	debug("initializing character device\n");
 	cdev_init(&lunix_chrdev_cdev, &lunix_chrdev_fops);
 	lunix_chrdev_cdev.owner = THIS_MODULE;
-	
+
 	dev_no = MKDEV(LUNIX_CHRDEV_MAJOR, 0);
 	/* ? */
 	/* register_chrdev_region? */
 	if (ret < 0) {
 		debug("failed to register region, ret = %d\n", ret);
 		goto out;
-	}	
+	}
 	/* ? */
 	/* cdev_add? */
 	if (ret < 0) {
@@ -218,7 +219,7 @@ void lunix_chrdev_destroy(void)
 {
 	dev_t dev_no;
 	unsigned int lunix_minor_cnt = lunix_sensor_cnt << 3;
-		
+
 	debug("entering\n");
 	dev_no = MKDEV(LUNIX_CHRDEV_MAJOR, 0);
 	cdev_del(&lunix_chrdev_cdev);
