@@ -77,7 +77,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	/* ? */
 	unsigned long state_flags;
 	uint32_t temp_timestamp;
-	unint16_t temp_values;
+	uint16_t temp_values;
 	int refresh;
 
 	/* Why use spinlocks? See LDD3, p. 119 */
