@@ -65,6 +65,10 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 {
 	struct lunix_sensor_struct *sensor;
+	unsigned long state_flags;
+	uint32_t temp_timestamp;
+	uint16_t temp_values;
+	int refresh;
 
 	debug("leaving\n");
 	WARN_ON ( !(sensor = state->sensor));
@@ -75,10 +79,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	 * spinlock for as little as possible.
 	 */
 	/* ? */
-	unsigned long state_flags;
-	uint32_t temp_timestamp;
-	uint16_t temp_values;
-	int refresh;
+
 
 	/* Why use spinlocks? See LDD3, p. 119 */
 	debug("lunix_chrdev_state_update got called");
@@ -153,11 +154,12 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	/* ? */
 
 	struct lunix_chrdev_state_struct *p_state;
-	//allocate memory on kernel space for p_state struct --> GFP_KERNEL
+	//allocate memory on kernel space for p_state struct --> GFP_KERNEL (observed from lunix-sensors.c)
 	p_state = kzalloc(sizeof(struct lunix_chrdev_state_struct), GFP_KERNEL);
 	if (!p_state) {
+		ret = -ENOMEM; //out of memory error
 		printk(KERN_ERR "Failed to allocate memory for Lunix sensors\n");
-		goto out;
+		goto out; //skip private struct initialization
 	}
 	//initialize p_state struct with values
 
@@ -167,7 +169,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
 	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
 
-	//initialize a semaphore
+	//initialize a semaphore with 1 as initial value
 	sema_init(&p_state->lock,1);
 
 
@@ -182,9 +184,11 @@ out:
 	return ret;
 }
 
-static int lunix_chrdev_release(struct inode *inode, struct file *filp)
+static int lunix_chrdev_release(struct inode *inode, struct file *filp) //done!
 {
-	kfree(filp->private_data);
+	debug("freed memory via lunix_chrden_release");
+	kfree(filp->private_data); //free previous kzalloc memory allocation - also could have written
+	//kfree(p_state);
 	return 0;
 }
 
