@@ -42,11 +42,19 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 {
 	struct lunix_sensor_struct *sensor;
 
+	debug("state_needs_refresh got called");
 	WARN_ON ( !(sensor = state->sensor));
+
 	/* ? */
+	return (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
+
+//state->type is an enum that is the type of the sensor. (lunix-module.c, lunix.h)
+//last_update is the timestamp of the last time the sensor was updated through lunix_sensor_update (lunix-sensors.c)
+//buf_timestamp (lunix-chrdev.h) is the last time the state buffer got "filled" with new data
+//if the two timestamps are different, then, the state needs a refresh, so we return 1
 
 	/* The following return is bogus, just for the stub to compile */
-	return 0; /* ? */
+	//return 0; /* ? */
 }
 
 /*
@@ -59,23 +67,47 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	struct lunix_sensor_struct *sensor;
 
 	debug("leaving\n");
+	WARN_ON ( !(sensor = state->sensor));
+
 
 	/*
 	 * Grab the raw data quickly, hold the
 	 * spinlock for as little as possible.
 	 */
 	/* ? */
+	unsigned long state_flags;
+	uint32_t temp_timestamp;
+	unint16_t temp_values;
+	int refresh;
+
 	/* Why use spinlocks? See LDD3, p. 119 */
+	debug("lunix_chrdev_state_update got called");
+	spin_lock_irqsave(&sensor->lock, state_flags);
+
+	//No spinlocks after reading :P
+	//Code runs in intterrupt context, We need to disable intterrupts
+	//We save the interrupt state. Better be safe than sorry :)
+
 
 	/*
 	 * Any new data available?
 	 */
 	/* ? */
 
+	if (refresh = lunix_chrdev_state_needs_refresh(state)) {
+		//if yes, store them, so no more race conditions occur (less spinlocks)
+		temp_values = sensor->msr_data[state->type]->values[0];
+		temp_timestamp = sensor->msr_data[state->type]->last_update;
+	}
+
+	spin_unlock_irqrestore(&sensor->lock, state_flags);
+	debug(refresh);
 	/*
 	 * Now we can take our time to format them,
 	 * holding only the private state semaphore
 	 */
+
+
 
 	/* ? */
 
