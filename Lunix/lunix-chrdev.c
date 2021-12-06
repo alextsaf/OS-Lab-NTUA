@@ -124,7 +124,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 {
 	/* Declarations */
 	/* ? */
-	int ret, minor, sensor_type;
+	int ret, minor, sensor_type, sensor_nb;
 
 	debug("entering\n");
 	ret = -ENODEV;
@@ -139,9 +139,9 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	 * the minor number of the device node [/dev/sensor<NO>-<TYPE>]
 	 */
 
-	 minor = minor(inode); //get minor number from C function --> inode gets us the /dev/sensor info
+	 minor = iminor(inode); //get minor number from C function --> inode gets us the /dev/sensor info
 
-	 sensor_type = minor % 8 //
+	 sensor_type = minor % 8; //
 	 if (sensor_type >= N_LUNIX_MSR) goto out;
 
 	 sensor_nb = minor / 8; //
@@ -163,9 +163,11 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 
 	p_state->type = sensor_type;
 	p_state->sensor = &(lunix_sensors[sensor_nb]);
-	p_state->buf_timestamp = get_seconds();
-	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0';
-	p_state->buf_lim = strnlen(state->buf_data, LUNIX_CHRDEV_BUFSZ);
+	p_state->buf_timestamp = get_seconds(); //current timestamp
+	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
+	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
+
+	//initialize a semaphore
 	sema_init(&p_state->lock,1);
 
 
@@ -174,6 +176,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 
 	ret = 0; //everything is ok
 	debug("State of type %d and sensor %d successfully associated\n", sensor_type, sensor_nb);
+	
 out:
 	debug("leaving, with ret = %d\n", ret);
 	return ret;
