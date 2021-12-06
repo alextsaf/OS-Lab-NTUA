@@ -124,20 +124,56 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 {
 	/* Declarations */
 	/* ? */
-	int ret;
+	int ret, minor, sensor_type;
 
 	debug("entering\n");
 	ret = -ENODEV;
 	if ((ret = nonseekable_open(inode, filp)) < 0)
 		goto out;
 
+   //nonseekable_open = open but for subsystems that do not want seekable file descriptors.
+	 //inode represents file on disk
+
 	/*
 	 * Associate this open file with the relevant sensor based on
 	 * the minor number of the device node [/dev/sensor<NO>-<TYPE>]
 	 */
 
+	 minor = minor(inode); //get minor number from C function --> inode gets us the /dev/sensor info
+
+	 sensor_type = minor % 8 //
+	 if (sensor_type >= N_LUNIX_MSR) goto out;
+
+	 sensor_nb = minor / 8; //
+	 debug("inode from /dev/sensor associated");
+
+	 //buf_lim = int, buf_data = unsigned char (sizeof(20)), buf_timestamp = uint32_t
+	 //lock = struct semaphore
 	/* Allocate a new Lunix character device private state structure */
 	/* ? */
+
+	struct lunix_chrdev_state_struct *p_state;
+	//allocate memory on kernel space for p_state struct --> GFP_KERNEL
+	p_state = kzalloc(sizeof(struct lunix_chrdev_state_struct), GFP_KERNEL);
+	if (!p_state) {
+		printk(KERN_ERR "Failed to allocate memory for Lunix sensors\n");
+		goto out;
+	}
+	//initialize p_state struct with values
+
+	p_state->type = sensor_type;
+	p_state->sensor = &(lunix_sensors[sensor_nb]);
+	p_state->buf_timestamp = get_seconds();
+	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0';
+	p_state->buf_lim = strnlen(state->buf_data, LUNIX_CHRDEV_BUFSZ);
+	sema_init(&p_state->lock,1);
+
+
+	filp->private_data = p_state;
+	//State struct must be private
+
+	ret = 0; //everything is ok
+	debug("State of type %d and sensor %d successfully associated\n", sensor_type, sensor_nb);
 out:
 	debug("leaving, with ret = %d\n", ret);
 	return ret;
@@ -145,7 +181,7 @@ out:
 
 static int lunix_chrdev_release(struct inode *inode, struct file *filp)
 {
-	/* ? */
+	kfree(filp->private_data);
 	return 0;
 }
 
