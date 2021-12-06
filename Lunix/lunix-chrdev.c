@@ -101,7 +101,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	}
 
 	spin_unlock_irqrestore(&sensor->lock, state_flags);
-	debug(refresh);
+	debug("state needs refresh: %d\n", refresh);
 	/*
 	 * Now we can take our time to format them,
 	 * holding only the private state semaphore
