@@ -176,7 +176,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 
 	ret = 0; //everything is ok
 	debug("State of type %d and sensor %d successfully associated\n", sensor_type, sensor_nb);
-	
+
 out:
 	debug("leaving, with ret = %d\n", ret);
 	return ret;
