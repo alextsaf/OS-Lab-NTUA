@@ -46,7 +46,6 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 	debug("state_needs_refresh got called");
 	WARN_ON ( !(sensor = state->sensor));
 	ret = (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
-	debug("state_needs_refresh exits, last update: %"PRIu32" , buffer timestamp: %"PRIu32", result = %d", sensor->msr_data[state->type]->last_update, state->buf_timestamp, ret);
 	/* ? */
 	return ret;
 
