@@ -69,7 +69,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	long result, *lookup[N_LUNIX_MSR]= {lookup_voltage, lookup_temperature, lookup_light};
 	uint32_t temp_timestamp;
 	uint16_t temp_values;
-	int refresh;
+	int refresh, ret;
 
 	debug("leaving\n");
 	WARN_ON ( !(sensor = state->sensor));
