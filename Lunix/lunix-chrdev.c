@@ -243,7 +243,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 			/* See LDD3, page 153 for a hint */
 			up(&state->lock);
 			update = lunix_chrdev_state_update(state);
-			if (wait_event_interruptible(sensor->wq,(update != -EAGAIN)){ //needs to be filled
+			if (wait_event_interruptible(sensor->wq,(update != -EAGAIN))){ //needs to be filled
 				return -ERESTARTSYS;
 			}
 			if (down_interruptible(&state->lock)){
