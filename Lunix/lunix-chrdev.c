@@ -118,7 +118,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 		 result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
 		 state->buf_timestamp = temp_timestamp;
 		 //Warning: result is XXYYY but should be XX.YYY
-		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result%1000);
+		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result_dec);
 	 }
 	 ret = 0;
 
