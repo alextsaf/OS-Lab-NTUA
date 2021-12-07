@@ -66,7 +66,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 {
 	struct lunix_sensor_struct *sensor;
 	unsigned long state_flags;
-	long result, *lookup[N_LUNIX_MSR]= {lookup_voltage, lookup_temperature, lookup_light};
+	long result, result_dec, *lookup[N_LUNIX_MSR]= {lookup_voltage, lookup_temperature, lookup_light};
 	uint32_t temp_timestamp;
 	uint16_t temp_values;
 	int refresh, ret;
@@ -101,6 +101,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 		temp_timestamp = sensor->msr_data[state->type]->last_update;
 	}
 	else {
+		spin_unlock_irqrestore(&sensor->lock, state_flags);
 		ret = -EAGAIN;
 		goto out;
 	}
@@ -114,6 +115,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 
 	 if (refresh) {
 		 result = lookup[state->type][temp_values];
+		 result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
 		 state->buf_timestamp = temp_timestamp;
 		 //Warning: result is XXYYY but should be XX.YYY
 		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result%1000);
