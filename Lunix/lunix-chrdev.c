@@ -41,12 +41,14 @@ struct cdev lunix_chrdev_cdev;
 static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *state)
 {
 	struct lunix_sensor_struct *sensor;
+	int ret;
 
 	debug("state_needs_refresh got called");
 	WARN_ON ( !(sensor = state->sensor));
-
+	ret = (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
+	debug("state_needs_refresh exits, last update: %"PRIu32" , buffer timestamp: %"PRIu32", result = %d", sensor->msr_data[state->type]->last_update, state->buf_timestamp, ret);
 	/* ? */
-	return (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
+	return ret;
 
 //state->type is an enum that is the type of the sensor. (lunix-module.c, lunix.h)
 //last_update is the timestamp of the last time the sensor was updated through lunix_sensor_update (lunix-sensors.c)
@@ -71,7 +73,6 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	uint16_t temp_values;
 	int refresh, ret;
 
-	debug("leaving\n");
 	WARN_ON ( !(sensor = state->sensor));
 
 
@@ -102,6 +103,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	}
 	else {
 		spin_unlock_irqrestore(&sensor->lock, state_flags);
+		debug("state needs refresh: %d\n", refresh);
 		ret = -EAGAIN;
 		goto out;
 	}
@@ -119,12 +121,14 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 		 state->buf_timestamp = temp_timestamp;
 		 //Warning: result is XXYYY but should be XX.YYY
 		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result_dec);
+		 debug("Value %ld.%ld of sensor %d printed to state buffer", result/1000, result_dec, state->type);
 	 }
+
 	 ret = 0;
 
 	/* ? */
 	out:
-	debug("leaving\n");
+	debug("leaving state update\n");
 	return ret;
 }
 
@@ -226,6 +230,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	//down_interruptible allows a user-space process that is waiting on a semaphore
 	//to be interrupted by the user
 		/* Lock? */
+	debug("locked read");
 	if (down_interruptible(&state->lock)){
 		return -ERESTARTSYS;
 	}
@@ -245,6 +250,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 			/* See LDD3, page 153 for a hint */
 			up(&state->lock);
 			update = lunix_chrdev_state_update(state);
+			debug("state updated --> go copy to user");
 			if (wait_event_interruptible(sensor->wq,(update != -EAGAIN))){ //needs to be filled
 				return -ERESTARTSYS;
 			}
@@ -264,6 +270,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	check = copy_to_user(usrbuf, (state->buf_data + *f_pos) ,cnt);
 	//if number of bytes that could not be copied > 0 --> copy_to_user
 	//basically failed
+	debug("copy to user successful");
 	if (check > 0){
 		ret = -EFAULT;
 		goto out;
@@ -281,6 +288,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 out:
 	up(&state->lock); //unlock on out. NOTE:copy_to_user CAN sleep but will not bring
 	//us in a deadlock state.
+	debug("read complete with ret returnd: %zu", ret);
 	return ret;
 }
 
