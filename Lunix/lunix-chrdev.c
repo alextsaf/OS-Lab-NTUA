@@ -47,6 +47,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 	WARN_ON ( !(sensor = state->sensor));
 	ret = (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
 	/* ? */
+	debug("state refresh returned ret: %d", ret);
 	return ret;
 
 //state->type is an enum that is the type of the sensor. (lunix-module.c, lunix.h)
