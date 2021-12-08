@@ -64,71 +64,71 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
  * based on sensor data. Must be called with the
  * character device state lock held.
  */
-static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
-{
-	struct lunix_sensor_struct *sensor;
-	unsigned long state_flags;
-	long result, result_dec, *lookup[N_LUNIX_MSR]= {lookup_voltage, lookup_temperature, lookup_light};
-	uint32_t temp_timestamp;
-	uint16_t temp_values;
-	int refresh, ret;
+ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
+ {
+ 	struct lunix_sensor_struct *sensor;
+ 	unsigned long state_flags;
+ 	long result, result_dec, *lookup[N_LUNIX_MSR]= {lookup_voltage, lookup_temperature, lookup_light};
+ 	uint32_t temp_timestamp;
+ 	uint16_t temp_values;
+ 	int refresh, ret;
 
-	WARN_ON ( !(sensor = state->sensor));
-
-
-	/*
-	 * Grab the raw data quickly, hold the
-	 * spinlock for as little as possible.
-	 */
+ 	WARN_ON ( !(sensor = state->sensor));
 
 
-	/* Why use spinlocks? See LDD3, p. 119 */
-	debug("lunix_chrdev_state_update got called");
-	spin_lock_irqsave(&sensor->lock, state_flags);
-
-	//No spinlocks after reading :P
-	//Code runs in intterrupt context, We need to disable intterrupts
-	//We save the interrupt state. Better be safe than sorry :)
+ 	/*
+ 	 * Grab the raw data quickly, hold the
+ 	 * spinlock for as little as possible.
+ 	 */
 
 
-	/*
-	 * Any new data available?
-	 */
+ 	/* Why use spinlocks? See LDD3, p. 119 */
+ 	debug("lunix_chrdev_state_update got called");
+ 	spin_lock_irqsave(&sensor->lock, state_flags);
 
-	if (refresh = lunix_chrdev_state_needs_refresh(state)) {
-		//if yes, store them, so no more race conditions occur (less spinlocks)
-		temp_values = sensor->msr_data[state->type]->values[0];
-		temp_timestamp = sensor->msr_data[state->type]->last_update;
-	}
-	else {
-		spin_unlock_irqrestore(&sensor->lock, state_flags);
-		debug("state needs refresh: %d\n", refresh);
-		ret = -EAGAIN;
-		goto out;
-	}
+ 	//No spinlocks after reading :P
+ 	//Code runs in intterrupt context, We need to disable intterrupts
+ 	//We save the interrupt state. Better be safe than sorry :)
 
-	spin_unlock_irqrestore(&sensor->lock, state_flags);
-	debug("state needs refresh: %d\n", refresh);
-	/*
-	 * Now we can take our time to format them,
-	 * holding only the private state semaphore
-	 */
 
-	 if (refresh) {
-		 result = lookup[state->type][temp_values];
-		 result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
-		 state->buf_timestamp = temp_timestamp;
-		 //Warning: result is XXYYY but should be XX.YYY
-		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result_dec);
-		 debug("Value %ld.%ld of sensor %d printed to state buffer", result/1000, result_dec, state->type);
-	 }
+ 	/*
+ 	 * Any new data available?
+ 	 */
 
-	 ret = 0;
+ 	if (refresh = lunix_chrdev_state_needs_refresh(state)) {
+ 		//if yes, store them, so no more race conditions occur (less spinlocks)
+ 		temp_values = sensor->msr_data[state->type]->values[0];
+ 		temp_timestamp = sensor->msr_data[state->type]->last_update;
+ 	}
+ 	else {
+ 		spin_unlock_irqrestore(&sensor->lock, state_flags);
+ 		debug("state needs refresh: %d\n", refresh);
+ 		ret = -EAGAIN;
+ 		goto out;
+ 	}
 
-	out:
-	debug("leaving state update\n");
-	return ret;
-}
+ 	spin_unlock_irqrestore(&sensor->lock, state_flags);
+ 	debug("state needs refresh: %d\n", refresh);
+ 	/*
+ 	 * Now we can take our time to format them,
+ 	 * holding only the private state semaphore
+ 	 */
+
+ 	 if (refresh) {
+ 		 result = lookup[state->type][temp_values];
+ 		 result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
+ 		 state->buf_timestamp = temp_timestamp;
+ 		 //Warning: result is XXYYY but should be XX.YYY
+ 		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result_dec);
+ 		 debug("Value %ld.%ld of sensor %d printed to state buffer", result/1000, result_dec, state->type);
+ 	 }
+
+ 	 ret = 0;
+
+ 	out:
+ 	debug("leaving state update\n");
+ 	return ret;
+ }
 
 /*************************************
  * Implementation of file operations
@@ -177,8 +177,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 
 	p_state->type = sensor_type;
 	p_state->sensor = &(lunix_sensors[sensor_nb]);
-	//p_state->buf_timestamp = get_seconds(); //current timestamp
-	p_state->buf_timestamp = 0; //mporei???
+	p_state->buf_timestamp = get_seconds(); //current timestamp
 	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
 	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
 	debug("p_state->buf_lim at init: %d",p_state->buf_lim);
@@ -298,9 +297,49 @@ out:
 	return ret;
 }
 
+
+//Page 422 of FDD3
+void lunix_chrdev_vma_open(struct vm_area_struct *vma)
+{
+	printk(KERN_NOTICE "Simple VMA open, virt %lx, phys %lx\n", vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+}
+
+void lunix_chrdven_vma_close(struct vm_area_struct *vma)
+{
+	printk(KERN_NOTICE "Simple VMA close.\n");
+}
+
+static struct vm_operations_struct lunix_chrdev_vm_ops = {
+	.open = lunix_chrdev_vma_open,
+	.close = lunix_chrdev_vma_close,
+};
+
+//NOTE: this function only returns ONE page, the specific application does not need more, it can be imporved
 static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	return -EINVAL;
+	struct lunix_chrdev_state_struct *state;
+	struct lunix_sensor_struct *sensor;
+
+	unsigned long kmap_return;
+	struct page *kernel_page;
+	sensor = state->sensor;
+
+	//pointer of VA's page from values receieved
+	kernel_page = virt_to_page(sensor->msr_data[state->type]->values);
+	//VA of page with values receieved
+	kmap_return = kmap(kernel_page);
+	//convert VA to Physical Address
+	vma->vg_pgoff = __pa(kmap_return) >> PAGE_SHIFT;
+
+	//map device memory to user address space
+	if (remap_pfn_range(vma, vma->vm_start, vm->vm_pgoff,vma->vm_end - vma->vm_start, vma->vm_page_prot)){
+		return -EAGAIN;
+	}
+	//link to struct and use vma_open
+	vma->vm_ops = $lunix_chrdev_vm_ops;
+	lunix_chrdevn_vma_open(vma);
+
+	return 0;
 }
 
 static struct file_operations lunix_chrdev_fops =
