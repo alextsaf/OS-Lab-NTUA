@@ -93,7 +93,6 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	/*
 	 * Any new data available?
 	 */
-	/* ? */
 
 	if (refresh = lunix_chrdev_state_needs_refresh(state)) {
 		//if yes, store them, so no more race conditions occur (less spinlocks)
@@ -125,7 +124,6 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 
 	 ret = 0;
 
-	/* ? */
 	out:
 	debug("leaving state update\n");
 	return ret;
@@ -210,6 +208,8 @@ static long lunix_chrdev_ioctl(struct file *filp, unsigned int cmd, unsigned lon
 	/* Why? */
 	return -EINVAL;
 }
+
+
 //create a blocking i/o read Function
 static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t cnt, loff_t *f_pos)
 {
@@ -260,12 +260,13 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	}
 
 	/* End of file */
-	/* ? */
-
+	//End of file is done in check below --> if (*f_pos == state->buf_lim)
 	/* Determine the number of cached bytes to copy to userspace */
-	/* ? */
+	//if buffer limit - file position < cnt then cnt = buf_limit - f_pos
+	//otherwise cnt = cnt receieved from function
+	
 	cnt = ((state->buf_lim - *f_pos) <= cnt) ? (state->buf_lim - *f_pos) : cnt;
-
+	
 	check = copy_to_user(usrbuf, (state->buf_data + *f_pos) ,cnt);
 	//if number of bytes that could not be copied > 0 --> copy_to_user
 	//basically failed
@@ -288,6 +289,7 @@ out:
 	up(&state->lock); //unlock on out. NOTE:copy_to_user CAN sleep but will not bring
 	//us in a deadlock state.
 	debug("read complete with ret returnd: %zu", ret);
+	//ret is numbers written to userspace OR error message if failed
 	return ret;
 }
 
