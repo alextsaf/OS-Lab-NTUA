@@ -176,7 +176,8 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 
 	p_state->type = sensor_type;
 	p_state->sensor = &(lunix_sensors[sensor_nb]);
-	p_state->buf_timestamp = get_seconds(); //current timestamp
+	//p_state->buf_timestamp = get_seconds(); //current timestamp
+	p_state->buf_timestamp = 0; //mporei???
 	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
 	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
 	debug("p_state->buf_lim at init: %d",p_state->buf_lim);
