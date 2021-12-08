@@ -84,7 +84,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	 /*
 		* Any new data available?
 		*/
-		
+
 	/* Why use spinlocks? See LDD3, p. 119 */
 	debug("lunix_chrdev_state_update got called");
 	spin_lock_irqsave(&sensor->lock, state_flags);
