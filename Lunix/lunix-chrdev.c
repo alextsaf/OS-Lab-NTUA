@@ -81,40 +81,30 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	 * spinlock for as little as possible.
 	 */
 
-
+	 /*
+		* Any new data available?
+		*/
+		
 	/* Why use spinlocks? See LDD3, p. 119 */
 	debug("lunix_chrdev_state_update got called");
 	spin_lock_irqsave(&sensor->lock, state_flags);
+
+	temp_values = sensor->msr_data[state->type]->values[0];
+ 	temp_timestamp = sensor->msr_data[state->type]->last_update;
+	spin_unlock_irqrestore(&sensor->lock, state_flags);
 
 	//No spinlocks after reading :P
 	//Code runs in intterrupt context, We need to disable intterrupts
 	//We save the interrupt state. Better be safe than sorry :)
 
-
-	/*
-	 * Any new data available?
-	 */
-
-	if (refresh = lunix_chrdev_state_needs_refresh(state)) {
-		//if yes, store them, so no more race conditions occur (less spinlocks)
-		temp_values = sensor->msr_data[state->type]->values[0];
-		temp_timestamp = sensor->msr_data[state->type]->last_update;
-	}
-	else {
-		spin_unlock_irqrestore(&sensor->lock, state_flags);
-		debug("state needs refresh: %d\n", refresh);
-		ret = -EAGAIN;
-		goto out;
-	}
-
-	spin_unlock_irqrestore(&sensor->lock, state_flags);
-	debug("state needs refresh: %d\n", refresh);
 	/*
 	 * Now we can take our time to format them,
 	 * holding only the private state semaphore
 	 */
+	 refresh = lunix_chrdev_state_needs_refresh(state);
 
 	 if (refresh) {
+		 debug("state needs refresh: %d\n", refresh);
 		 result = lookup[state->type][temp_values];
 		 result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
 		 state->buf_timestamp = temp_timestamp;
@@ -122,7 +112,11 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result_dec);
 		 debug("Value %ld.%ld of sensor %d printed to state buffer", result/1000, result_dec, state->type);
 	 }
-
+	 else {
+ 		//debug("state needs refresh: %d\n", refresh);
+ 		ret = -EAGAIN;
+ 		goto out;
+ 	}
 	 ret = 0;
 
 	out:
