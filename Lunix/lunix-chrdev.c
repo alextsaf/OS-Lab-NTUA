@@ -180,7 +180,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
 	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
 	debug("p_state->buf_lim at init: %d",p_state->buf_lim);
-	
+
 	//initialize a semaphore with 1 as initial value
 	sema_init(&p_state->lock,1);
 
@@ -245,13 +245,14 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	 //file position == 0??
 	 //while() code HEAVILY inspired by LDD3 page 153
 	if (*f_pos == 0) {
+		debug("waiting for state update in read: check 1");
 		while (lunix_chrdev_state_update(state) == -EAGAIN) {
 			/* The process needs to sleep */
 			/* See LDD3, page 153 for a hint */
 			up(&state->lock);
 			update = lunix_chrdev_state_update(state);
 			debug("state updated --> go copy to user");
-			if (wait_event_interruptible(sensor->wq,(update != -EAGAIN))){ //needs to be filled
+			if (wait_event_interruptible(sensor->wq,(update))){ //needs to be filled
 				return -ERESTARTSYS;
 			}
 			if (down_interruptible(&state->lock)){
