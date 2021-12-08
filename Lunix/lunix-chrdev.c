@@ -179,7 +179,8 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	p_state->buf_timestamp = get_seconds(); //current timestamp
 	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
 	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
-
+	debug("p_state->buf_lim at init: %d",p_state->buf_lim);
+	
 	//initialize a semaphore with 1 as initial value
 	sema_init(&p_state->lock,1);
 
@@ -264,9 +265,9 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	/* Determine the number of cached bytes to copy to userspace */
 	//if buffer limit - file position < cnt then cnt = buf_limit - f_pos
 	//otherwise cnt = cnt receieved from function
-	
+
 	cnt = ((state->buf_lim - *f_pos) <= cnt) ? (state->buf_lim - *f_pos) : cnt;
-	
+
 	check = copy_to_user(usrbuf, (state->buf_data + *f_pos) ,cnt);
 	//if number of bytes that could not be copied > 0 --> copy_to_user
 	//basically failed
