@@ -180,6 +180,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	p_state->buf_data[LUNIX_CHRDEV_BUFSZ - 1]='\0'; //initialised
 	p_state->buf_lim = strnlen(p_state->buf_data, LUNIX_CHRDEV_BUFSZ);
 	debug("p_state->buf_lim at init: %d",p_state->buf_lim);
+	debug("buf_timestamp at init: %u", p_state->buf_timestamp);
 
 	//initialize a semaphore with 1 as initial value
 	sema_init(&p_state->lock,1);
