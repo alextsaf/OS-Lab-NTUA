@@ -250,7 +250,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 			/* The process needs to sleep */
 			/* See LDD3, page 153 for a hint */
 			up(&state->lock);
-			update = lunix_chrdev_state_update(state);
+			update = lunix_chrdev_state_needs_refresh(state);
 			debug("state updated --> go copy to user");
 			if (wait_event_interruptible(sensor->wq,(update))){ //needs to be filled
 				return -ERESTARTSYS;
