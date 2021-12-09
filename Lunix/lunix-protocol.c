@@ -74,9 +74,10 @@ static void lunix_protocol_update_sensors(struct lunix_protocol_state_struct *st
 		//debug ("I have the following raw data from nodeid = %d: { batt, temp, light } = { 0x%04x, 0x%04x, 0x%04x }\n",
 		//	nodeid, batt, temp, light);
 
-		if (nodeid > 0 && nodeid <= lunix_sensor_cnt)
+		if (nodeid > 0 && nodeid <= lunix_sensor_cnt) {
 			lunix_sensor_update(&lunix_sensors[nodeid - 1], batt, temp, light);
 			debug("sensor_update got called");
+		}
 		else
 			printk(KERN_WARNING "Node id %d is out of bounds [maximum %d sensors]\n",
 				nodeid, lunix_sensor_cnt);
