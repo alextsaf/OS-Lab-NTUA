@@ -322,6 +322,8 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	unsigned long kmap_return;
 	struct page *kernel_page;
+	state = filp->private_data;
+	
 	sensor = state->sensor;
 
 	//pointer of VA's page from values receieved

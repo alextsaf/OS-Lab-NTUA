@@ -6,12 +6,13 @@
 #include <sys/stat.h>
 #include <inttypes.h>
 
+#define LUNIX_CHRDEV_BUFSZ      20      /* Buffer size used to hold textual info */
+
 //directly from lunix.h
 struct lunix_msr_data_struct {
   uint32_t magic;
 	uint32_t last_update;
 	uint32_t values[];
-
 };
 
 int main(int argc, char *argv[]){
@@ -31,13 +32,13 @@ int main(int argc, char *argv[]){
     perror("Opening Sensor File failed");
     exit(2);
   }
-
-  buff_a = mmap(NULL, 30, PROT_READ, MAP_PRIVATE, fd, 0);
+  //mmap VA address
+  buff_a = mmap(NULL, LUNIX_CHRDEV_BUFSZ, PROT_READ, MAP_PRIVATE, fd, 0);
   if (buff_a == MAP_FAILED){
     perror("Memory mapping failed");
-    exit(0);
+    return 1;
   }
-
+  //Synexhs leitourgia :)
   while(1) {
     buf_timestamp = buff_a->last_update;
     if(buf_timestamp != current_timestamp){
@@ -45,5 +46,5 @@ int main(int argc, char *argv[]){
     }
   }
   close(fd);
-  munmap(buff_a, 30);
+  munmap(buff_a, LUNIX_CHRDEV_BUFSZ);
   }
