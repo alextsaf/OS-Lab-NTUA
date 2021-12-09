@@ -304,7 +304,7 @@ void lunix_chrdev_vma_open(struct vm_area_struct *vma)
 	printk(KERN_NOTICE "Simple VMA open, virt %lx, phys %lx\n", vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
 }
 
-void lunix_chrdven_vma_close(struct vm_area_struct *vma)
+void lunix_chrdev_vma_close(struct vm_area_struct *vma)
 {
 	printk(KERN_NOTICE "Simple VMA close.\n");
 }
@@ -329,16 +329,17 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 	//VA of page with values receieved
 	kmap_return = kmap(kernel_page);
 	//convert VA to Physical Address
-	vma->vg_pgoff = __pa(kmap_return) >> PAGE_SHIFT;
+	vma->vm_pgoff = __pa(kmap_return) >> PAGE_SHIFT;
 
-	//map device memory to user address space
-	if (remap_pfn_range(vma, vma->vm_start, vm->vm_pgoff,vma->vm_end - vma->vm_start, vma->vm_page_prot)){
+	//map device memory to user address space -- page size is vm_end - vm_start = 1 Page.
+	//function is safe if mm semaphore is HELD.
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,vma->vm_end - vma->vm_start, vma->vm_page_prot)){
 		return -EAGAIN;
 	}
 	//link to struct and use vma_open
 	vma->vm_ops = $lunix_chrdev_vm_ops;
-	lunix_chrdevn_vma_open(vma);
-
+	lunix_chrdev_vma_open(vma);
+	//return 0 on success
 	return 0;
 }
 
