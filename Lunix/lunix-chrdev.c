@@ -44,7 +44,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 	int ret;
 
 	debug("state_needs_refresh got called");
-	WARN_ON ( !(sensor = state->sensor));
+	WARN_ON ( !(sensor = state->sensor));result_dec = (result%1000 < 0) ? -result
 	ret = (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
 	/* ? */
 	debug("state refresh returned ret: %d", ret);
@@ -256,6 +256,8 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 			if (wait_event_interruptible(sensor->wq,(update))){ //needs to be filled
 				return -ERESTARTSYS;
 			}
+			debug("woken up");
+
 			if (down_interruptible(&state->lock)){
 				return -ERESTARTSYS;
 			}

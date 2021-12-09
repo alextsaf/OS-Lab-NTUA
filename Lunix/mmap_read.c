@@ -44,7 +44,7 @@ int main(int argc, char *argv[]){
   while(1) {
     // result =
     // result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
-    usleep(400);
+    //usleep(400);
     buf_timestamp = buff_a->last_update;
     if(buf_timestamp != current_timestamp){
       printf("Current Sensor Value: %u\n", buff_a->values[0]);

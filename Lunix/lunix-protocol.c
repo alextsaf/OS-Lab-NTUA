@@ -21,13 +21,13 @@
 #include "lunix-protocol.h"
 
 /*
- * Returns an unsigned 16-bit integer in native byte-order from 
+ * Returns an unsigned 16-bit integer in native byte-order from
  * two bytes in an XMesh packet, which is always little-endian
  */
 static uint16_t uint16_from_packet(unsigned char *p)
 {
 	uint16_t le;
-	
+
 	memcpy(&le, p, 2);
 	return le16_to_cpu(le);
 }
@@ -69,13 +69,14 @@ static void lunix_protocol_update_sensors(struct lunix_protocol_state_struct *st
 		batt = uint16_from_packet(&state->packet[VREF_OFFSET]);
 		temp = uint16_from_packet(&state->packet[TEMPERATURE_OFFSET]);
 		light = uint16_from_packet(&state->packet[LIGHT_OFFSET]);
-		
+
 		/* FIXME */
 		//debug ("I have the following raw data from nodeid = %d: { batt, temp, light } = { 0x%04x, 0x%04x, 0x%04x }\n",
 		//	nodeid, batt, temp, light);
 
 		if (nodeid > 0 && nodeid <= lunix_sensor_cnt)
 			lunix_sensor_update(&lunix_sensors[nodeid - 1], batt, temp, light);
+			debug("sensor_update got called");
 		else
 			printk(KERN_WARNING "Node id %d is out of bounds [maximum %d sensors]\n",
 				nodeid, lunix_sensor_cnt);
@@ -83,7 +84,7 @@ static void lunix_protocol_update_sensors(struct lunix_protocol_state_struct *st
 }
 
 /**********************************************************************************
- * PACKET STRUCTURE						
+ * PACKET STRUCTURE
  * BYTE				VALUE		MEANING
  * 0				0x7E		Packet Start byte signature
  * 1				0x??		Packet Type
@@ -123,10 +124,10 @@ void lunix_protocol_init(struct lunix_protocol_state_struct *state)
  * Crucial function for parsing the input packet according
  * to the current state.
  *
- * struct lunix_protocol_state_struct *state: 
+ * struct lunix_protocol_state_struct *state:
  * unsigned char *data: the data received
  * int length: the amount of bytes received
- * int *i: the pointer to the data received is updated when data are 
+ * int *i: the pointer to the data received is updated when data are
  *         transferred to the unparsed_packet array
  * int use_specials: if 1 special characters are treated acc
  */
@@ -196,7 +197,7 @@ static int lunix_protocol_parse_state(struct lunix_protocol_state_struct *state,
 		//debug("returning 1 from state = %d, btr = %d, br = %d, next_is_special = %d\n",
 		//	state->state, state->bytes_to_read, state->bytes_read, state->next_is_special);
 		return 1;
-	}	
+	}
 
 	//debug("returning 0 from state = %d, btr = %d, br = %d, next_is_special = %d\n",
 	//	state->state, state->bytes_to_read, state->bytes_read, state->next_is_special);
@@ -216,42 +217,42 @@ int lunix_protocol_received_buf(struct lunix_protocol_state_struct *state,
 
 	i = 0;
 
-	if (state->state == SEEKING_START_BYTE) 
+	if (state->state == SEEKING_START_BYTE)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 0) == 1)
 			set_state(state, SEEKING_PACKET_TYPE, 1, 0);
 
 
-	if (state->state == SEEKING_PACKET_TYPE) 
+	if (state->state == SEEKING_PACKET_TYPE)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 0) == 1)
 			set_state(state, SEEKING_DESTINATION_ADDRESS, 2, 0);
 
-	if (state->state == SEEKING_DESTINATION_ADDRESS) 
+	if (state->state == SEEKING_DESTINATION_ADDRESS)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 1) == 1)
 			set_state(state, SEEKING_AM_TYPE, 1, 0);
 
-	if (state->state == SEEKING_AM_TYPE) 
+	if (state->state == SEEKING_AM_TYPE)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 1) == 1)
 			set_state(state, SEEKING_AM_GROUP, 1, 0);
 
-	if (state->state == SEEKING_AM_GROUP) 
+	if (state->state == SEEKING_AM_GROUP)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 1) == 1)
 			set_state(state, SEEKING_PAYLOAD_LENGTH, 1, 0);
 
-	if (state->state == SEEKING_PAYLOAD_LENGTH) 
+	if (state->state == SEEKING_PAYLOAD_LENGTH)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 1) == 1) {
 			payload_length = state->packet[state->pos - 1];
 			set_state(state, SEEKING_PAYLOAD, payload_length, 0);
 		}
 
-	if (state->state == SEEKING_PAYLOAD) 
+	if (state->state == SEEKING_PAYLOAD)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 1) == 1)
 			set_state(state, SEEKING_CRC, 2, 0);
 
-	if (state->state == SEEKING_CRC) 
+	if (state->state == SEEKING_CRC)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 1) == 1)
 			set_state(state, SEEKING_END_BYTE, 1, 0);
 
-	if (state->state == SEEKING_END_BYTE) 
+	if (state->state == SEEKING_END_BYTE)
 		if (lunix_protocol_parse_state(state, buf, length, &i, 0) == 1) {
 			//debug("An XMesh packet has been received, updating sensors\n");
 
