@@ -44,7 +44,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 	int ret;
 
 	debug("state_needs_refresh got called");
-	WARN_ON ( !(sensor = state->sensor));result_dec = (result%1000 < 0) ? -result
+	WARN_ON ( !(sensor = state->sensor));
 	ret = (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
 	/* ? */
 	debug("state refresh returned ret: %d", ret);
