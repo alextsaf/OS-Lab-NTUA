@@ -34,7 +34,7 @@ int main(int argc, char *argv[]){
   }
   //mmap VA address. NOTE: Do not ask for more than LUNIX_CHRDEV_BUFSZ=20.
   //Our function is limited to creating only 1 page.
-  
+
   buff_a = mmap(NULL, LUNIX_CHRDEV_BUFSZ, PROT_READ, MAP_PRIVATE, fd, 0);
   if (buff_a == MAP_FAILED){
     perror("Memory mapping failed");
@@ -42,6 +42,8 @@ int main(int argc, char *argv[]){
   }
   //Synexhs leitourgia :)
   while(1) {
+    // result =
+    // result_dec = (result%1000 < 0) ? -result%1000 : result%1000;
     usleep(400);
     buf_timestamp = buff_a->last_update;
     if(buf_timestamp != current_timestamp){

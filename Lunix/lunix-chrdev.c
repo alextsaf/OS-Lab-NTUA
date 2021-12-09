@@ -97,7 +97,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 
  	if (refresh = lunix_chrdev_state_needs_refresh(state)) {
  		//if yes, store them, so no more race conditions occur (less spinlocks)
- 		temp_values = sensor->msr_data[state->type]->values[0];
+ 		temp_values = sensor->msr_data[state->type]->values[0]; //RAW data
  		temp_timestamp = sensor->msr_data[state->type]->last_update;
  	}
  	else {
@@ -138,7 +138,6 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 {
 	/* Declarations */
-	/* ? */
 	int ret, minor, sensor_type, sensor_nb;
 
 	debug("entering\n");
