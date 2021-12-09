@@ -32,7 +32,9 @@ int main(int argc, char *argv[]){
     perror("Opening Sensor File failed");
     exit(2);
   }
-  //mmap VA address
+  //mmap VA address. NOTE: Do not ask for more than LUNIX_CHRDEV_BUFSZ=20.
+  //Our function is limited to creating only 1 page.
+  
   buff_a = mmap(NULL, LUNIX_CHRDEV_BUFSZ, PROT_READ, MAP_PRIVATE, fd, 0);
   if (buff_a == MAP_FAILED){
     perror("Memory mapping failed");
@@ -40,6 +42,7 @@ int main(int argc, char *argv[]){
   }
   //Synexhs leitourgia :)
   while(1) {
+    usleep(400);
     buf_timestamp = buff_a->last_update;
     if(buf_timestamp != current_timestamp){
       printf("Current Sensor Value: %u\n", buff_a->values[0]);
@@ -47,4 +50,5 @@ int main(int argc, char *argv[]){
   }
   close(fd);
   munmap(buff_a, LUNIX_CHRDEV_BUFSZ);
+  return 0;
   }

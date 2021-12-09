@@ -320,7 +320,7 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct lunix_chrdev_state_struct *state;
 	struct lunix_sensor_struct *sensor;
 
-	unsigned long kmap_return;
+	unsigned long *kmap_return;
 	struct page *kernel_page;
 	state = filp->private_data;
 
