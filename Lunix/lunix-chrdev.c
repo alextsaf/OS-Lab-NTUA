@@ -323,13 +323,13 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 	unsigned long kmap_return;
 	struct page *kernel_page;
 	state = filp->private_data;
-	
+
 	sensor = state->sensor;
 
 	//pointer of VA's page from values receieved
 	kernel_page = virt_to_page(sensor->msr_data[state->type]->values);
 	//VA of page with values receieved
-	kmap_return = kmap(kernel_page);
+	kmap_return = page_address(kernel_page);
 	//convert VA to Physical Address
 	vma->vm_pgoff = __pa(kmap_return) >> PAGE_SHIFT;
 
@@ -339,7 +339,7 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EAGAIN;
 	}
 	//link to struct and use vma_open
-	vma->vm_ops = $lunix_chrdev_vm_ops;
+	vma->vm_ops = &lunix_chrdev_vm_ops;
 	lunix_chrdev_vma_open(vma);
 	//return 0 on success
 	return 0;
