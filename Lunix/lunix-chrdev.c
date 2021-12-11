@@ -46,7 +46,6 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 	debug("state_needs_refresh got called");
 	WARN_ON ( !(sensor = state->sensor));
 	ret = (sensor->msr_data[state->type]->last_update != state->buf_timestamp);
-	/* ? */
 	debug("state refresh returned ret: %d", ret);
 	return ret;
 
@@ -54,9 +53,6 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 //last_update is the timestamp of the last time the sensor was updated through lunix_sensor_update (lunix-sensors.c)
 //buf_timestamp (lunix-chrdev.h) is the last time the state buffer got "filled" with new data
 //if the two timestamps are different, then, the state needs a refresh, so we return 1
-
-	/* The following return is bogus, just for the stub to compile */
-	//return 0; /* ? */
 }
 
 /*
@@ -106,7 +102,6 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
  		ret = -EAGAIN;
  		goto out;
  	}
-
  	spin_unlock_irqrestore(&sensor->lock, state_flags);
  	debug("state needs refresh: %d\n", refresh);
  	/*
@@ -122,7 +117,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
  		 state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", result/1000, result_dec);
  		 debug("Value %ld.%ld of sensor %d printed to state buffer", result/1000, result_dec, state->type);
  	 }
-
+	 //update successful
  	 ret = 0;
 
  	out:
@@ -165,6 +160,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	 //lock = struct semaphore
 	/* Allocate a new Lunix character device private state structure */
 	struct lunix_chrdev_state_struct *p_state;
+
 	//allocate memory on kernel space for p_state struct --> GFP_KERNEL (observed from lunix-sensors.c)
 	p_state = kzalloc(sizeof(struct lunix_chrdev_state_struct), GFP_KERNEL);
 	if (!p_state) {
@@ -172,8 +168,8 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 		printk(KERN_ERR "Failed to allocate memory for Lunix sensors\n");
 		goto out; //skip private struct initialization
 	}
-	//initialize p_state struct with values
 
+	//initialize p_state struct with values
 	p_state->type = sensor_type;
 	p_state->sensor = &(lunix_sensors[sensor_nb]);
 	p_state->buf_timestamp = get_seconds(); //current timestamp
@@ -205,18 +201,40 @@ static int lunix_chrdev_release(struct inode *inode, struct file *filp) //done!
 	return 0;
 }
 
+//missing struct inode *inode --> we cover that at open function
 static long lunix_chrdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	/* Why? */
-	return -EINVAL;
+	struct lunix_chrdev_state_struct *state;
+	//skip wrong cmds
+	if (_IOC_TYPE(cmd) != LUNIX_IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > LUNIX_IOC_MAXNR) return -ENOTTY;
+	//get state
+	state = filp->private_data;
+
+	if(cmd) {
+		if (LUNIX_IOC_DATA_TYPE){
+			if(down_interruptible(&state->lock)){
+				return -ERESTARTSYS;
+			}
+			//line for defining raw or cooked data
+			state->data_type = (state->data_type) ? 0 : 1;
+			up(&state->lock);
+			break;
+		}
+	}
+	else {
+		return -ENOTTY;
+	}
+	debug("IOCTL decoded!");
+
+	return 0;
 }
 
 
-//create a blocking i/o read Function
+//create a blocking (or non blocking) i/o read Function
 static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t cnt, loff_t *f_pos)
 {
 	ssize_t ret;
-	//ssize_t count_bytes;
 	struct lunix_sensor_struct *sensor;
 	struct lunix_chrdev_state_struct *state;
 	unsigned long check;
@@ -230,7 +248,6 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 
 	//down_interruptible allows a user-space process that is waiting on a semaphore
 	//to be interrupted by the user
-		/* Lock? */
 	debug("locked read");
 	if (down_interruptible(&state->lock)){
 		return -ERESTARTSYS;
