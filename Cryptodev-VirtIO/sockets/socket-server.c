@@ -122,7 +122,7 @@ int main(void)
 			FD_SET(newsd, &readfds);
 
 			//see which fd has something to say
-			select(2, &readfds, NULL, NULL, &timeout);
+			select(newsd+1, &readfds, NULL, NULL, &timeout);
 
 			if (FD_ISSET(newsd, &readfds)){
 				n = read(newsd, buf, sizeof(buf));

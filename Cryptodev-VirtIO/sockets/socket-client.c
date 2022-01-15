@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 		FD_SET(0, &readfds);
 		FD_SET(sd, &readfds);
 
-		select(2, &readfds, NULL, NULL, &timeout);
+		select(sd+1, &readfds, NULL, NULL, &timeout);
 
 		if (FD_ISSET(sd, &readfds)){
 			n = read(sd, buf, sizeof(buf));
