@@ -13,17 +13,34 @@
 #include <signal.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <fcntl.h>
 
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/ioctl.h>
 #include <poll.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <crypto/cryptodev.h>
 
 #include "crypto-common.h"
+
+
+#define DATA_SIZE       256
+#define BLOCK_SIZE      16
+#define KEY_SIZE	16  /* AES128 */
+
+//initializations
+unsigned char buf[DATA_SIZE];
+struct session_op sess;
+unsigned char key[KEY_SIZE] = "mpougatsiarides1";
+unsigned char iv[BLOCK_SIZE] = "hsfairaponanana1";
+
+
+
 
 /* Insist until all of the data has been written */
 ssize_t insist_write(int fd, const void *buf, size_t cnt)
@@ -42,15 +59,87 @@ ssize_t insist_write(int fd, const void *buf, size_t cnt)
 	return orig_cnt;
 }
 
+int encrypt_data(int cfd)
+{
+	int i;
+	struct crypt_op cryp;
+	struct {
+		unsigned char 	in[DATA_SIZE],
+				encrypted[DATA_SIZE];
+			} data;
+
+
+	memset(&cryp, 0, sizeof(cryp));
+
+	cryp.ses = sess.ses;
+	cryp.len = sizeof(buf);
+	cryp.src = buf;
+	cryp.dst = data.encrypted;
+	cryp.iv = iv;
+	cryp.op = COP_ENCRYPT;
+
+	if (ioctl(cfd, CIOCCRYPT, &cryp)) {
+		perror("Error encrypting");
+		return 1;
+	}
+
+	memset(buf, '\0', sizeof(DATA_SIZE));
+	for (i = 0; i < sizeof(buf); i++){
+		buf[i] = data.encrypted[i];
+	}
+	//write(1, data.encrypted,sizeof(data.encrypted));
+	//Function returns 0 on success
+	return 0;
+}
+
+
+int decrypt_data(int cfd)
+{
+	int i;
+	struct crypt_op cryp;
+	struct {
+		unsigned char 	in[DATA_SIZE],
+				decrypted[DATA_SIZE];
+			} data;
+
+	memset(&cryp, 0, sizeof(cryp));
+	memset(&data.decrypted, 0, sizeof(DATA_SIZE));
+
+	cryp.ses = sess.ses;
+	cryp.len = sizeof(buf);
+	cryp.src = buf;
+	cryp.dst = data.decrypted;
+	cryp.iv = iv;
+	cryp.op = COP_DECRYPT;
+
+
+	if (ioctl(cfd, CIOCCRYPT, &cryp)) {
+		perror("Error decrypting");
+		return 1;
+	}
+
+	memset(buf, '\0', sizeof(DATA_SIZE));
+	for (i = 0; i < sizeof(buf); i++) {
+				buf[i] = data.decrypted[i];
+	}
+
+	//Function returns 0 on success
+	return 0;
+}
+
+
+
 int main(int argc, char *argv[])
 {
 	int sd, port;
 	ssize_t n;
-	char buf[100];
+
 	char *hostname;
 	struct hostent *hp;
 	struct sockaddr_in sa;
 
+	printf("Size of buffer: %ld\n",sizeof(buf));
+	memset (&sess, 0, sizeof(sess));
 	if (argc != 3) {
 		fprintf(stderr, "Usage: %s hostname port\n", argv[0]);
 		exit(1);
@@ -82,17 +171,35 @@ int main(int argc, char *argv[])
 	}
 	fprintf(stderr, "Connected.\n");
 
-	/* Be careful with buffer overruns, ensure NUL-termination */
-	strncpy(buf, HELLO_THERE, sizeof(buf));
-	buf[sizeof(buf) - 1] = '\0';
-
-	/* Say something... */
-	if (insist_write(sd, buf, strlen(buf)) != strlen(buf)) {
-		perror("write");
+	//Open Cryptodev module
+	int crypto_fd = open("/dev/crypto", O_RDWR);
+	if (crypto_fd < 0){
+		perror("Opening cryptodev failed");
 		exit(1);
 	}
-	// fprintf(stdout, "I said:\n%s\nRemote says:\n", buf);
-	fflush(stdout);
+
+	//Initialize session
+
+	sess.cipher = CRYPTO_AES_CBC;
+	sess.keylen = KEY_SIZE;
+	sess.key = key;
+
+	if (ioctl(crypto_fd, CIOCGSESSION, &sess)) {
+		perror("Crypto session init failed");
+		return 1;
+	}
+
+	// /* Be careful with buffer overruns, ensure NUL-termination */
+	// strncpy(buf, HELLO_THERE, sizeof(buf));
+	// buf[sizeof(buf) - 1] = '\0';
+
+	// /* Say something... */
+	// if (insist_write(sd, buf, sizeof(buf)) != sizeof(buf)) {
+	// 	perror("write");
+	// 	exit(1);
+	// }
+	// // fprintf(stdout, "I said:\n%s\nRemote says:\n", buf);
+	// fflush(stdout);
 
 	/*
 	* Let the remote know we're not going to write anything else.
@@ -114,6 +221,7 @@ int main(int argc, char *argv[])
 
 
 	for (;;) {
+		memset(buf, '\0', sizeof(buf));
 		//readfds set init
 		FD_ZERO(&readfds);
 
@@ -124,6 +232,7 @@ int main(int argc, char *argv[])
 		select(sd+1, &readfds, NULL, NULL, &timeout);
 
 		if (FD_ISSET(sd, &readfds)){
+
 			n = read(sd, buf, sizeof(buf));
 
 			if (n < 0) {
@@ -134,7 +243,8 @@ int main(int argc, char *argv[])
 			if (n <= 0)
 				break;
 
-			if (insist_write(1, buf, n) != n) {
+			decrypt_data(crypto_fd);
+			if (insist_write(1, buf, sizeof(buf)) != sizeof(buf)) {
 				perror("Client wrote to stdout");
 				exit(1);
 			}
@@ -150,12 +260,23 @@ int main(int argc, char *argv[])
 			if (n <= 0)
 				break;
 
-			if (insist_write(sd, buf, n) != n) {
+			encrypt_data(crypto_fd);
+			if (insist_write(sd, buf, sizeof(buf)) != sizeof(buf)) {
 				perror("Client wrote to peer");
 				exit(1);
 			}
 		}
 	}
 	fprintf(stderr, "\nDone.\n");
+
+	if (ioctl(crypto_fd, CIOCFSESSION, &sess.ses)) {
+		perror("Error on ending Crypto Session");
+		exit(1);
+	}
+	if (close(crypto_fd) < 0){
+		perror("Erron on closing Cryptodev module FD");
+		exit(1);
+	}
+
 	return 0;
 }
