@@ -22,19 +22,9 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <crypto/cryptodev.h>
+
 
 #include "socket-common.h"
-
-
-#define DATA_SIZE       256
-#define BLOCK_SIZE      16
-#define KEY_SIZE	16  /* AES128 */
-
-//initializations
-
-struct session_op sess;
-unsigned char key[] = "mpougatsiarides"
 
 /* Convert a buffer to upercase */
 void toupper_buf(char *buf, size_t n)
@@ -144,7 +134,7 @@ int main(void)
 					fprintf(stderr, "Peer went away\n");
 					break;
 				}
-			//	toupper_buf(buf, n);
+				
 				if (insist_write(1, buf, n) != n) {
 					perror("write to remote peer failed");
 					break;

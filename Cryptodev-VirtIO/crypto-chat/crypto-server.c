@@ -76,6 +76,7 @@ int encrypt_data(int cfd)
 
 memset(&cryp, 0, sizeof(cryp));
 
+//Initialize crypto struct with crypto session info
 cryp.ses = sess.ses;
 cryp.len = sizeof(buf);
 cryp.src = buf;
@@ -83,12 +84,12 @@ cryp.dst = data.encrypted;
 cryp.iv = iv;
 cryp.op = COP_ENCRYPT;
 
-
+//send IO command to encrypt from buf to data.encrypted
 if (ioctl(cfd, CIOCCRYPT, &cryp)) {
 	perror("Error encrypting");
 	return 1;
 }
-
+//for buffer-size fill it with encrypted data
 for (i = 0; i < sizeof(buf); i++){
 	buf[i] = data.encrypted[i];
 }
@@ -107,7 +108,7 @@ int decrypt_data(int cfd)
 	} data;
 
 memset(&cryp, 0, sizeof(cryp));
-
+//Initialize crypto struct with crypto session info
 cryp.ses = sess.ses;
 cryp.len = sizeof(buf);
 cryp.src = buf;
@@ -116,7 +117,7 @@ cryp.iv = iv;
 cryp.op = COP_DECRYPT;
 
 
-
+//send IO command to decrypt from buf to data.decrypted
 if (ioctl(cfd, CIOCCRYPT, &cryp)) {
 	perror("Error decrypting");
 	return 1;
@@ -161,10 +162,8 @@ int main(void)
 
 	sess.cipher = CRYPTO_AES_CBC;
 	sess.keylen = KEY_SIZE;
-	printf("ok before memcpy \n");
 	sess.key = key;
 
-	printf("ok before ioctl init \n");
 	if (ioctl(crypto_fd, CIOCGSESSION, &sess)) {
 		perror("Crypto session init failed");
 		return 1;
@@ -214,7 +213,7 @@ int main(void)
 		/* We break out of the loop when the remote peer goes away */
 		for (;;) {
 			memset(buf, '\0', sizeof(buf));
-			//printf("Size of buffer in loop: %ld\n",sizeof(buf));
+
 			//readfds set init
 			FD_ZERO(&readfds);
 
@@ -251,7 +250,7 @@ int main(void)
 					fprintf(stderr, "Peer went away\n");
 					break;
 				}
-				// toupper_buf(buf, n);
+
 				encrypt_data(crypto_fd);
 
 				if (insist_write(newsd, buf, sizeof(buf)) != sizeof(buf)) {

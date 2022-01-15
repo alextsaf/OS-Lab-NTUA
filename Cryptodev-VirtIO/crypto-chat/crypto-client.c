@@ -40,8 +40,6 @@ unsigned char key[KEY_SIZE] = "mpougatsiarides1";
 unsigned char iv[BLOCK_SIZE] = "hsfairaponanana1";
 
 
-
-
 /* Insist until all of the data has been written */
 ssize_t insist_write(int fd, const void *buf, size_t cnt)
 {
@@ -70,7 +68,7 @@ int encrypt_data(int cfd)
 
 
 	memset(&cryp, 0, sizeof(cryp));
-
+	//Initialize crypto struct with crypto session info
 	cryp.ses = sess.ses;
 	cryp.len = sizeof(buf);
 	cryp.src = buf;
@@ -78,16 +76,18 @@ int encrypt_data(int cfd)
 	cryp.iv = iv;
 	cryp.op = COP_ENCRYPT;
 
+	//send IO command to encrypt from buf to data.encrypted
 	if (ioctl(cfd, CIOCCRYPT, &cryp)) {
 		perror("Error encrypting");
 		return 1;
 	}
-
+	//init empty buffer
 	memset(buf, '\0', sizeof(DATA_SIZE));
+	//for buffer-size fill it with encrypted data
 	for (i = 0; i < sizeof(buf); i++){
 		buf[i] = data.encrypted[i];
 	}
-	//write(1, data.encrypted,sizeof(data.encrypted));
+
 	//Function returns 0 on success
 	return 0;
 }
@@ -103,8 +103,9 @@ int decrypt_data(int cfd)
 			} data;
 
 	memset(&cryp, 0, sizeof(cryp));
-	memset(&data.decrypted, 0, sizeof(DATA_SIZE));
 
+
+	//Initialize crypto struct with crypto session info
 	cryp.ses = sess.ses;
 	cryp.len = sizeof(buf);
 	cryp.src = buf;
@@ -112,13 +113,16 @@ int decrypt_data(int cfd)
 	cryp.iv = iv;
 	cryp.op = COP_DECRYPT;
 
-
+	//send IO command to decrypt from buf to data.decrypted
 	if (ioctl(cfd, CIOCCRYPT, &cryp)) {
 		perror("Error decrypting");
 		return 1;
 	}
-
+	
+	//init empty buffer
 	memset(buf, '\0', sizeof(DATA_SIZE));
+
+	//for buffer-size fill it with decrypted data
 	for (i = 0; i < sizeof(buf); i++) {
 				buf[i] = data.decrypted[i];
 	}
@@ -138,7 +142,6 @@ int main(int argc, char *argv[])
 	struct hostent *hp;
 	struct sockaddr_in sa;
 
-	printf("Size of buffer: %ld\n",sizeof(buf));
 	memset (&sess, 0, sizeof(sess));
 	if (argc != 3) {
 		fprintf(stderr, "Usage: %s hostname port\n", argv[0]);
@@ -179,12 +182,11 @@ int main(int argc, char *argv[])
 	}
 
 	//Initialize session
-
 	sess.cipher = CRYPTO_AES_CBC;
 	sess.keylen = KEY_SIZE;
 	sess.key = key;
 
-	if (ioctl(crypto_fd, CIOCGSESSION, &sess)) {
+	if (ioctl(crypto_fd, CIOCGSESSION, &sess)) { //send IO command to begin session
 		perror("Crypto session init failed");
 		return 1;
 	}
@@ -211,14 +213,12 @@ int main(int argc, char *argv[])
 	// }
 
 	/* Read answer and write it to standard output */
-	//nfds = 2 (stdout and sd)
-	//readfds = 0(stdout) sd(sd)
 
-	struct timeval timeout;
 	fd_set readfds;
+	struct timeval timeout;
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 0;
-
+	//Timeout with 0.0 timer is basically Polling
 
 	for (;;) {
 		memset(buf, '\0', sizeof(buf));
@@ -229,10 +229,11 @@ int main(int argc, char *argv[])
 		FD_SET(0, &readfds);
 		FD_SET(sd, &readfds);
 
+		//nfds = max_fd + 1
 		select(sd+1, &readfds, NULL, NULL, &timeout);
 
+		//If something is ready to be read from socket_fd
 		if (FD_ISSET(sd, &readfds)){
-
 			n = read(sd, buf, sizeof(buf));
 
 			if (n < 0) {
@@ -243,12 +244,14 @@ int main(int argc, char *argv[])
 			if (n <= 0)
 				break;
 
+			//decrypt data that was received from socket <-- server
 			decrypt_data(crypto_fd);
 			if (insist_write(1, buf, sizeof(buf)) != sizeof(buf)) {
 				perror("Client wrote to stdout");
 				exit(1);
 			}
 		}
+		//If something is ready to be sent through socket --> server
 		if (FD_ISSET(0, &readfds)){
 			n = read(0, buf, sizeof(buf));
 
@@ -260,6 +263,7 @@ int main(int argc, char *argv[])
 			if (n <= 0)
 				break;
 
+			//encrypt data that will be sent through socket --> server
 			encrypt_data(crypto_fd);
 			if (insist_write(sd, buf, sizeof(buf)) != sizeof(buf)) {
 				perror("Client wrote to peer");
@@ -269,11 +273,12 @@ int main(int argc, char *argv[])
 	}
 	fprintf(stderr, "\nDone.\n");
 
-	if (ioctl(crypto_fd, CIOCFSESSION, &sess.ses)) {
+	if (ioctl(crypto_fd, CIOCFSESSION, &sess.ses)) { //Send IO command to end session
 		perror("Error on ending Crypto Session");
 		exit(1);
 	}
-	if (close(crypto_fd) < 0){
+
+	if (close(crypto_fd) < 0){ //close Cryptodev module
 		perror("Erron on closing Cryptodev module FD");
 		exit(1);
 	}
