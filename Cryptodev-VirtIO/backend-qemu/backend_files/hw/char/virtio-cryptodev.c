@@ -4,7 +4,7 @@
  * Implementation of virtio-cryptodev qemu backend device.
  *
  * Dimitris Siakavaras <jimsiak@cslab.ece.ntua.gr>
- * Stefanos Gerangelos <sgerag@cslab.ece.ntua.gr> 
+ * Stefanos Gerangelos <sgerag@cslab.ece.ntua.gr>
  * Konstantinos Papazafeiropoulos <kpapazaf@cslab.ece.ntua.gr>
  *
  */
@@ -52,6 +52,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
 {
     VirtQueueElement *elem;
     unsigned int *syscall_type;
+    int *crdev_fd;
 
     DEBUG_IN();
 
@@ -59,7 +60,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
     if (!elem) {
         DEBUG("No item to pop from VQ :(");
         return;
-    } 
+    }
 
     DEBUG("I have got an item from VQ :)");
 
@@ -84,7 +85,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
         printf("Guest says: %s\n", output_msg);
         printf("We say: %s\n", input_msg);
         break;
-
+        //switch-case
     default:
         DEBUG("Unknown syscall_type");
         break;

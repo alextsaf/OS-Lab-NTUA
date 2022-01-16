@@ -58,14 +58,14 @@ static int virtcons_probe(struct virtio_device *vdev)
 	crdev->vq = find_vq(vdev);
 	if (!(crdev->vq)) {
 		ret = -ENXIO;
-		goto out;		
+		goto out;
 	}
 
 	/* Other initializations. */
 	/* ?? */
-
+	sema_init(&crdev->lock, 1);
 	/**
-	 * Grab the next minor number and put the device in the driver's list. 
+	 * Grab the next minor number and put the device in the driver's list.
 	 **/
 	spin_lock_irq(&crdrvdata.lock);
 	crdev->minor = crdrvdata.next_minor++;
