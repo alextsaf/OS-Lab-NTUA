@@ -23,6 +23,8 @@
 
 #include "cryptodev.h"
 
+#define MSG_LEN 100
+
 /*
 * Global data
 */
@@ -213,12 +215,14 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		sgs_ioctl_cmd, sgs_key, sgs_sess_op, sgs_host_return_val,
 		sgs_sess_id, sgs_crypt_op, sgs_src, sgs_iv, sgs_dst, *sgs[8];
 		unsigned int num_out, num_in, len, *syscall_type, *ioctl_cmd;
-		#define MSG_LEN 100
-		uint32_t *sess_id;
-		struct crypt_op *crypt;
-		struct session_op *sess_op;
-		unsigned char *sess_key;
-		unsigned char *src, *dst, *iv;
+
+
+		//Need to be initialized to NULL or else kfree() complains.
+		uint32_t *sess_id = NULL;
+		struct crypt_op *crypt = NULL;
+		struct session_op *sess_op = NULL;
+		unsigned char *sess_key = NULL;
+		unsigned char *src = NULL, *dst = NULL, *iv = NULL;
 
 		debug("Entering");
 
@@ -252,8 +256,6 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		switch (cmd) {
 			case CIOCGSESSION:
 			debug("CIOCGSESSION");
-			memcpy(output_msg, "Hello HOST from ioctl CIOCGSESSION.", 36);
-
 			*ioctl_cmd = VIRTIO_CRYPTODEV_IOCTL_CIOCGSESSION;
 			sg_init_one(&sgs_ioctl_cmd, ioctl_cmd, sizeof(ioctl_cmd));
 			sgs[num_out++] = &sgs_ioctl_cmd;
@@ -291,7 +293,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 
 			case CIOCFSESSION:
 			debug("CIOCFSESSION");
-			memcpy(output_msg, "Hello HOST from ioctl CIOCFSESSION.", 36);
+
 
 			*ioctl_cmd = VIRTIO_CRYPTODEV_IOCTL_CIOCFSESSION;
 			sg_init_one(&sgs_ioctl_cmd, ioctl_cmd, sizeof(ioctl_cmd));
@@ -301,7 +303,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			if (copy_from_user(sess_id, (uint32_t *)arg, sizeof(sess_id)))
 			{
 				debug("CIOCFSESSION: copy_from_user failed (session ID)");
-				ret = --EFAULT;
+				ret = -EFAULT;
 				goto fail;
 			}
 			//u32 ses id -> Read flag
@@ -316,7 +318,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 
 			case CIOCCRYPT:
 			debug("CIOCCRYPT");
-			memcpy(output_msg, "Hello HOST from ioctl CIOCCRYPT.", 33);
+
 
 			*ioctl_cmd = VIRTIO_CRYPTODEV_IOCTL_CIOCCRYPT;
 			sg_init_one(&sgs_ioctl_cmd, ioctl_cmd, sizeof(ioctl_cmd));
@@ -343,7 +345,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sgs[num_out++] = &sgs_src;
 
 			iv = kzalloc(BLOCK_SIZE * sizeof(char), GFP_KERNEL);
-			if (copy_from_user(iv, cryp->iv, BLOCK_SIZE * sizeof(char)))
+			if (copy_from_user(iv, crypt->iv, BLOCK_SIZE * sizeof(char)))
 			{
 				debug("CIOCCRYPT: copy_from_user failed (iv)");
 				ret = -EFAULT;
@@ -376,7 +378,9 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 
 		/* ?? */
 		/* ?? Lock ?? */
-		down_interruptible(&crdev->lock);
+		if (down_interruptible(&crdev->lock)){
+			return -ERESTARTSYS;
+		}
 		err = virtqueue_add_sgs(vq, sgs, num_out, num_in,
 			&sgs_syscall_type, GFP_ATOMIC);
 		virtqueue_kick(vq);
@@ -388,7 +392,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		switch (cmd) {
 			case CIOCGSESSION:
 				if (copy_to_user((struct session_op*) arg, sess_op, sizeof(*sess_op))){
-					DEBUG("CIOCGSESSION: copy_to_user failed (session)");
+					debug("CIOCGSESSION: copy_to_user failed (session)");
 					ret = -EFAULT;
 					goto fail;
 				}
@@ -403,7 +407,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 				break;
 
 			case CIOCCRYPT:
-				if (copy_to_user((struct crypt_op *)arg)->dst, dst, crypt->len) {
+				if (copy_to_user(((struct crypt_op *)arg)->dst, dst, crypt->len) {
 					debug("CIOCCRYPT: copy_to_user (dst)");
 					ret = -EFAULT;
 					goto fail;
