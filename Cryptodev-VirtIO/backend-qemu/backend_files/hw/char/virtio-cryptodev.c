@@ -51,8 +51,14 @@ static void vser_reset(VirtIODevice *vdev)
 static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
 {
     VirtQueueElement *elem;
-    unsigned int *syscall_type;
+    unsigned int *syscall_type, *ioctl_cmd;
     int *crdev_fd;
+    unsigned char *key;
+    int *host_ret;
+    struct session_op *sess_op;
+    struct crypt_op *crypt;
+    uint32_t *sess_id;
+    unsigned char *src, *dst, *iv;
 
     DEBUG_IN();
 
@@ -69,23 +75,72 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
     case VIRTIO_CRYPTODEV_SYSCALL_TYPE_OPEN:
         DEBUG("VIRTIO_CRYPTODEV_SYSCALL_TYPE_OPEN");
         /* ?? */
+        crdev_fd = elem->in_sg[0].iov_base;
+        *crdev_fd = open("/dev/crypto", O_RDWR);
+        if (*crdev_fd < 0) {
+          debug("Error opening cryptodev module");
+        }
+        printf("Successfully opened cryptodev module, fd = %d\n", *crdev_fd);
         break;
 
     case VIRTIO_CRYPTODEV_SYSCALL_TYPE_CLOSE:
         DEBUG("VIRTIO_CRYPTODEV_SYSCALL_TYPE_CLOSE");
         /* ?? */
+        crdev_fd = elem->out_sg[1].iov_base;
+        if (close(*crdev_fd) < 0) {
+          debug("Error closing cryptodev module");
+        }
+        printf("Successfully closed cryptodev module, fd = %d\n", *crdev_fd);
         break;
 
     case VIRTIO_CRYPTODEV_SYSCALL_TYPE_IOCTL:
         DEBUG("VIRTIO_CRYPTODEV_SYSCALL_TYPE_IOCTL");
         /* ?? */
-        unsigned char *output_msg = elem->out_sg[1].iov_base;
-        unsigned char *input_msg = elem->in_sg[0].iov_base;
-        memcpy(input_msg, "Host: Welcome to the virtio World!", 35);
-        printf("Guest says: %s\n", output_msg);
-        printf("We say: %s\n", input_msg);
+        crdev_fd = elem->out_sg[1].iov_base;
+        ioctl_cmd = elem->out_sg[2].iov_base;
+
+        switch (*ioctl_cmd) {
+          case VIRTIO_CRYPTODEV_IOCTL_CIOCGSESSION:
+            debug("Entering CIOCGSESSION");
+            sess_key = elem->out_sg[3].iov_base;
+            sess_op = elem->in_sg[0].iov_base;
+            host_ret = elem->in_sg[1].iov_base;
+
+            sess_op->key = sess_key;
+            *host_ret = ioctl(*crdev_fd, CIOCGSESSION, sess_op);
+            if (*host_ret)
+              perror("Crypto session init failed");
+            break;
+          case VIRTIO_CRYPTODEV_IOCTL_CIOCFSESSION:
+            debug("Entering CIOCFSESSION");
+            sess_op = elem->out_sg[3].iov_base;
+            host_ret = elem->in_sg[0].iov_base;
+            *host_ret = ioctl(*credv_fd, CIOCFSESSION, sess_op)
+            if(*host_ret)
+              perror("Ending crypto session failed");
+            break;
+          case VIRTIO_CRYPTODEV_IOCTL_CIOCCRYPT:
+            debug("Entering CIOCCRYPT");
+            crypt = elem->out_sg[3].iov_base;
+            src = elem->out_sg[4].iov_base;
+            iv = elem->out_sg[5].iov_base;
+            dst = elem->in_sg[0].iov_base;
+            host_ret = elem->in_sg[1].iov_base;
+
+            crypt->src = src;
+            crypt->dst = dst;
+            crypt->iv = iv;
+            *host_ret = ioctl(*crypt_fd, CIOCCRYPT, crypt)
+            if(*host_ret)
+              perror("Error encrypting/decrypting from cryptodev module");
+            break;
+
+          default:
+            debug("Unknown ioctl command");
+            break;
+        }
         break;
-        //switch-case
+
     default:
         DEBUG("Unknown syscall_type");
         break;
