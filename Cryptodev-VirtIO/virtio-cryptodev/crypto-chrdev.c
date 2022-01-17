@@ -120,7 +120,7 @@ static int crypto_chrdev_open(struct inode *inode, struct file *filp)
 
 	virtqueue_add_sgs(crdev->vq, sgs, 1, 1, &sgs_syscall_type, GFP_ATOMIC); // TO ADD: TOKEN BUFFER
 	debug("open: sent sgs to backend");
-	virtqueue_kick(credv->vq);
+	virtqueue_kick(crdev->vq);
 	debug("open: notified host that new data has been sent (KICK)");
 
 	while(!virtqueue_get_buf(crdev->vq, &len));
@@ -152,16 +152,17 @@ static int crypto_chrdev_release(struct inode *inode, struct file *filp)
 	struct crypto_open_file *crof = filp->private_data;
 	struct crypto_device *crdev = crof->crdev;
 	unsigned int *syscall_type;
-	int *host_fd;
+	//int *host_fd;
+	unsigned int len;
 	struct scatterlist sgs_syscall_type, sgs_host_fd, *sgs[2];
-	
+
 	debug("Entering crypto-release");
 
 	syscall_type = kzalloc(sizeof(*syscall_type), GFP_KERNEL);
 	*syscall_type = VIRTIO_CRYPTODEV_SYSCALL_CLOSE;
 
-	host_fd = kzalloc(sizeof(host_fd), GFP_KERNEL)
-	*host_fd = crof->host_fd;
+	//host_fd = kzalloc(sizeof(host_fd), GFP_KERNEL)
+	//*host_fd = crof->host_fd;
 	/**
 	* Send data to the host.
 	**/
@@ -170,7 +171,7 @@ static int crypto_chrdev_release(struct inode *inode, struct file *filp)
 
 	sg_init_one(&sgs_syscall_type, syscall_type, sizeof(syscall_type));
 	sgs[0] = &sgs_syscall_type;
-	sg_init_one(&sgs_host_fd, host_fd, sizeof(host_fd));
+	sg_init_one(&sgs_host_fd, &crof->host_fd, sizeof(crof->host_fd));
 	sgs[1] = &sgs_host_fd;
 
 	/**
@@ -183,7 +184,7 @@ static int crypto_chrdev_release(struct inode *inode, struct file *filp)
 
 	virtqueue_add_sgs(crdev->vq, sgs, 2, 0, &sgs_syscall_type, GFP_ATOMIC); // TO ADD: TOKEN BUFFER
 	debug("open: sent sgs to backend");
-	virtqueue_kick(credv->vq);
+	virtqueue_kick(crdev->vq);
 	debug("open: notified host that new data has been sent (KICK)");
 
 	while(!virtqueue_get_buf(crdev->vq, &len));
@@ -213,13 +214,11 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		sgs_sess_id, sgs_crypt_op, sgs_src, sgs_iv, sgs_dst, *sgs[8];
 		unsigned int num_out, num_in, len, *syscall_type, *ioctl_cmd;
 		#define MSG_LEN 100
-		unsigned char *output_msg, *input_msg;
-		unsigned int *syscall_type, *ioctl_cmd;
-
+		uint32_t *sess_id;
 		struct crypt_op *crypt;
 		struct session_op *sess_op;
 		unsigned char *sess_key;
-		unsigned char *src, dst, iv;
+		unsigned char *src, *dst, *iv;
 
 		debug("Entering");
 
@@ -263,7 +262,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sess_op = kzalloc(sizeof(sess_op), GFP_KERNEL);
 			if (copy_from_user(sess_op, (struct session_op*)arg, sizeof(*sess_op)))
 			{
-				DEBUG("CIOCGSESSION: copy_from_user failed (session)");
+				debug("CIOCGSESSION: copy_from_user failed (session)");
 				ret = -EFAULT;
 				goto fail;
 			}
@@ -271,13 +270,13 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sess_key = kzalloc(sess_op->keylen*sizeof(char), GFP_KERNEL);
 			if (copy_from_user(sess_key, sess_op->key, sess_op->keylen*sizeof(char)))
 			{
-				DEBUG("CIOCGSESSION: copy_from_user failed (session key)");
+				debug("CIOCGSESSION: copy_from_user failed (session key)");
 				ret = -EFAULT;
 				goto fail;
 			}
 			//unsigned char session_key -> Read Flag
 
-			sg_init_one(&sgs_key, sess_key, sizeof(key));
+			sg_init_one(&sgs_key, sess_key, sizeof(sess_key));
 			sgs[num_out++] = &sgs_key;
 
 			//struct session_op session_op -> Write Flag
@@ -301,7 +300,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sess_id = kzalloc(sizeof(uint32_t), GFP_KERNEL);
 			if (copy_from_user(sess_id, (uint32_t *)arg, sizeof(sess_id)))
 			{
-				DEBUG("CIOCFSESSION: copy_from_user failed (session ID)");
+				debug("CIOCFSESSION: copy_from_user failed (session ID)");
 				ret = --EFAULT;
 				goto fail;
 			}
@@ -326,28 +325,28 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			crypt = kzalloc(sizeof(*crypt), GFP_KERNEL);
 			if (copy_from_user(crypt, (struct crypt_op *)arg, sizeof(crypt)))
 			{
-				DEBUG("CIOCCRYPT: copy_from_user failed (crypto)");
-				ret = --EFAULT;
+				debug("CIOCCRYPT: copy_from_user failed (crypto)");
+				ret = -EFAULT;
 				goto fail;
 			}
 			sg_init_one(&sgs_crypt_op, crypt, sizeof(crypt));
 			sgs[num_out++] = &sgs_crypt_op;
 
 			src = kzalloc(sizeof(char)*crypt->len, GFP_KERNEL);
-			if (copy_from_user(src, cryp->src, sizeof(char)*crypt->len))
+			if (copy_from_user(src, crypt->src, sizeof(char)*crypt->len))
 			{
-				DEBUG("CIOCCRYPT: copy_from_user failed (source)");
-				ret = --EFAULT;
+				debug("CIOCCRYPT: copy_from_user failed (source)");
+				ret = -EFAULT;
 				goto fail;
 			}
 			sg_init_one(&sgs_src, src, sizeof(src));
 			sgs[num_out++] = &sgs_src;
 
 			iv = kzalloc(BLOCK_SIZE * sizeof(char), GFP_KERNEL);
-			if (copy_from_user(iv, cryp->iv, BLOCK_SIZE * sizeof(char))
+			if (copy_from_user(iv, cryp->iv, BLOCK_SIZE * sizeof(char)))
 			{
-				DEBUG("CIOCCRYPT: copy_from_user failed (iv)");
-				ret = --EFAULT;
+				debug("CIOCCRYPT: copy_from_user failed (iv)");
+				ret = -EFAULT;
 				goto fail;
 			}
 			sg_init_one(&sgs_iv, iv, sizeof(iv));
@@ -395,7 +394,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 				}
 				break;
 
-			case CIOFSESSION:
+			case CIOCFSESSION:
 				if (copy_to_user((uint32_t *) arg, sess_id, sizeof(*sess_id))) {
 					debug("CIOCFSESSION: copy_to_user failed (sess_id)");
 					ret = -EFAULT;
@@ -404,7 +403,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 				break;
 
 			case CIOCCRYPT:
-				if (copy_to_user(struct crypt_op *) arg, dst,crypt->len) {
+				if (copy_to_user((struct crypt_op *)arg)->dst, dst, crypt->len) {
 					debug("CIOCCRYPT: copy_to_user (dst)");
 					ret = -EFAULT;
 					goto fail;
@@ -418,7 +417,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			kfree(dst);
 			kfree(iv);
 			kfree(src);
-			kfree(host_ret);
+			kfree(host_return_val);
 			kfree(syscall_type);
 			kfree(ioctl_cmd);
 			kfree(sess_key);
