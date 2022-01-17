@@ -101,7 +101,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
 
         switch (*ioctl_cmd) {
           case VIRTIO_CRYPTODEV_IOCTL_CIOCGSESSION:
-            debug("Entering CIOCGSESSION");
+            DEBUG("Entering CIOCGSESSION");
             sess_key = elem->out_sg[3].iov_base;
             sess_op = elem->in_sg[0].iov_base;
             host_ret = elem->in_sg[1].iov_base;
@@ -112,15 +112,15 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
               perror("Crypto session init failed");
             break;
           case VIRTIO_CRYPTODEV_IOCTL_CIOCFSESSION:
-            debug("Entering CIOCFSESSION");
-            sess_op = elem->out_sg[3].iov_base;
+            DEBUG("Entering CIOCFSESSION");
+            sess_id = elem->out_sg[3].iov_base;
             host_ret = elem->in_sg[0].iov_base;
-            *host_ret = ioctl(*credv_fd, CIOCFSESSION, sess_op)
+            *host_ret = ioctl(*credv_fd, CIOCFSESSION, sess_id);
             if(*host_ret)
               perror("Ending crypto session failed");
             break;
           case VIRTIO_CRYPTODEV_IOCTL_CIOCCRYPT:
-            debug("Entering CIOCCRYPT");
+            DEBUG("Entering CIOCCRYPT");
             crypt = elem->out_sg[3].iov_base;
             src = elem->out_sg[4].iov_base;
             iv = elem->out_sg[5].iov_base;
@@ -130,13 +130,13 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             crypt->src = src;
             crypt->dst = dst;
             crypt->iv = iv;
-            *host_ret = ioctl(*crypt_fd, CIOCCRYPT, crypt)
+            *host_ret = ioctl(*crypt_fd, CIOCCRYPT, crypt);
             if(*host_ret)
               perror("Error encrypting/decrypting from cryptodev module");
             break;
 
           default:
-            debug("Unknown ioctl command");
+            DEBUG("Unknown ioctl command");
             break;
         }
         break;

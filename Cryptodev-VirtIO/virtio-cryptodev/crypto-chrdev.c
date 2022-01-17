@@ -67,6 +67,7 @@ static int crypto_chrdev_open(struct inode *inode, struct file *filp)
 	struct crypto_device *crdev;
 	unsigned int *syscall_type;
 	int *host_fd;
+	struct scatterlist sgs_syscall_type, sgs_host_fd, *sgs[2];
 
 	debug("Entering");
 
@@ -102,7 +103,7 @@ static int crypto_chrdev_open(struct inode *inode, struct file *filp)
 	* We need two sg lists, one for syscall_type and one to get the
 	* file descriptor from the host.
 	**/
-	struct scatterlist sgs_syscall_type, sgs_host_fd, *sgs[2];
+
 
 	sg_init_one(&sgs_syscall_type, syscall_type, sizeof(syscall_type));
 	sgs[0] = &sgs_syscall_type;
@@ -133,7 +134,7 @@ static int crypto_chrdev_open(struct inode *inode, struct file *filp)
 
 	/* If host failed to open() return -ENODEV. */
 
-	if (crof->hostfd < 0){
+	if (crof->host_fd < 0){
 		debug("Failed to open crypto device");
 		ret = -ENODEV;
 	}
@@ -152,7 +153,8 @@ static int crypto_chrdev_release(struct inode *inode, struct file *filp)
 	struct crypto_device *crdev = crof->crdev;
 	unsigned int *syscall_type;
 	int *host_fd;
-
+	struct scatterlist sgs_syscall_type, sgs_host_fd, *sgs[2];
+	
 	debug("Entering crypto-release");
 
 	syscall_type = kzalloc(sizeof(*syscall_type), GFP_KERNEL);
@@ -164,7 +166,7 @@ static int crypto_chrdev_release(struct inode *inode, struct file *filp)
 	* Send data to the host.
 	**/
 
-	struct scatterlist sgs_syscall_type, sgs_host_fd, *sgs[2];
+
 
 	sg_init_one(&sgs_syscall_type, syscall_type, sizeof(syscall_type));
 	sgs[0] = &sgs_syscall_type;
