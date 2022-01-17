@@ -118,7 +118,7 @@ int decrypt_data(int cfd)
 		perror("Error decrypting");
 		return 1;
 	}
-	
+
 	//init empty buffer
 	memset(buf, '\0', sizeof(DATA_SIZE));
 
@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Connected.\n");
 
 	//Open Cryptodev module
-	int crypto_fd = open("/dev/crypto", O_RDWR);
+	int crypto_fd = open(argv[3], O_RDWR);
 	if (crypto_fd < 0){
 		perror("Opening cryptodev failed");
 		exit(1);

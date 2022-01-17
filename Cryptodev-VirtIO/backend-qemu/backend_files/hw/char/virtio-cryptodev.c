@@ -78,7 +78,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
         crdev_fd = elem->in_sg[0].iov_base;
         *crdev_fd = open("/dev/crypto", O_RDWR);
         if (*crdev_fd < 0) {
-          debug("Error opening cryptodev module");
+          DEBUG("Error opening cryptodev module");
         }
         printf("Successfully opened cryptodev module, fd = %d\n", *crdev_fd);
         break;
@@ -88,7 +88,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
         /* ?? */
         crdev_fd = elem->out_sg[1].iov_base;
         if (close(*crdev_fd) < 0) {
-          debug("Error closing cryptodev module");
+          DEBUG("Error closing cryptodev module");
         }
         printf("Successfully closed cryptodev module, fd = %d\n", *crdev_fd);
         break;

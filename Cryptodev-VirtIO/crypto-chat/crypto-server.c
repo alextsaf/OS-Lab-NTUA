@@ -130,7 +130,7 @@ for (i = 0; i < sizeof(buf); i++) {
 return 0;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
 
 	char addrstr[INET_ADDRSTRLEN];
@@ -152,7 +152,7 @@ int main(void)
 	fprintf(stderr, "Created TCP socket\n");
 
 	//Open Cryptodev module
-	int crypto_fd = open("/dev/crypto", O_RDWR);
+	int crypto_fd = open(argv[1], O_RDWR);
 	if (crypto_fd < 0){
 		perror("Opening cryptodev failed");
 		exit(1);
