@@ -142,7 +142,7 @@ static int crypto_chrdev_open(struct inode *inode, struct file *filp)
 	}
 
 	debug("Crypto device opened successfully");
-	ret = 1;
+
 	fail:
 	debug("Leaving");
 	return ret;
@@ -224,20 +224,36 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		unsigned char *sess_key = NULL;
 		unsigned char *src = NULL, *dst = NULL, *iv = NULL;
 
-		debug("Entering");
+		debug("Entering frontend ioctl");
 
 		/**
 		* Allocate all data that will be sent to the host.
 		**/
 		syscall_type = kzalloc(sizeof(*syscall_type), GFP_KERNEL);
+		if (!syscall_type){
+			ret = -ENOMEM;
+			printk(KERN_ERR "Failed to allocate memory for syscall_type\n");
+		}
 		*syscall_type = VIRTIO_CRYPTODEV_SYSCALL_IOCTL;
 
 		host_fd = kzalloc(sizeof(*host_fd), GFP_KERNEL);
+		if (!host_fd){
+			ret = -ENOMEM;
+			printk(KERN_ERR "Failed to allocate memory for host_fd\n");
+		}
 		*host_fd = crof->host_fd;
 
 		ioctl_cmd = kzalloc(sizeof(*ioctl_cmd), GFP_KERNEL);
+		if (!ioctl_cmd){
+			ret = -ENOMEM;
+			printk(KERN_ERR "Failed to allocate memory for ioctl_cmd\n");
+		}
 		//write sgs
 		host_return_val = kzalloc(sizeof(*host_return_val), GFP_KERNEL);
+		if (!host_return_val){
+			ret = -ENOMEM;
+			printk(KERN_ERR "Failed to allocate memory for host_return_val\n");
+		}
 
 		num_out = 0;
 		num_in = 0;
@@ -255,13 +271,20 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		**/
 		switch (cmd) {
 			case CIOCGSESSION:
-			debug("CIOCGSESSION");
+			debug("frontend CIOCGSESSION");
 			*ioctl_cmd = VIRTIO_CRYPTODEV_IOCTL_CIOCGSESSION;
 			sg_init_one(&sgs_ioctl_cmd, ioctl_cmd, sizeof(ioctl_cmd));
 			sgs[num_out++] = &sgs_ioctl_cmd;
+			debug("ioctl scatterlist init successful");
 
 			//arg will contain the session we want to open
 			sess_op = kzalloc(sizeof(sess_op), GFP_KERNEL);
+			if (!sess_op){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for session_op\n");
+				goto fail;
+			}
+
 			if (copy_from_user(sess_op, (struct session_op*)arg, sizeof(*sess_op)))
 			{
 				debug("CIOCGSESSION: copy_from_user failed (session)");
@@ -270,6 +293,11 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			}
 
 			sess_key = kzalloc(sess_op->keylen*sizeof(char), GFP_KERNEL);
+			if (!sess_key){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for sess_key\n");
+			}
+
 			if (copy_from_user(sess_key, sess_op->key, sess_op->keylen*sizeof(char)))
 			{
 				debug("CIOCGSESSION: copy_from_user failed (session key)");
@@ -280,15 +308,15 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 
 			sg_init_one(&sgs_key, sess_key, sizeof(sess_key));
 			sgs[num_out++] = &sgs_key;
-
+			debug("sess key scatterlist init successful");
 			//struct session_op session_op -> Write Flag
 			sg_init_one(&sgs_sess_op, sess_op, sizeof(sess_op));
 			sgs[num_in++ + num_out] = &sgs_sess_op;
-
+			debug("sess op scatterlist init successful");
 			//int host_return_val -> Write Flag
 			sg_init_one(&sgs_host_return_val, host_return_val, sizeof(host_return_val));
 			sgs[num_in++ + num_out] = &sgs_host_return_val;
-
+			debug("host_ret_val scatterlist init successful");
 			break;
 
 			case CIOCFSESSION:
@@ -300,6 +328,10 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sgs[num_out++] = &sgs_ioctl_cmd;
 
 			sess_id = kzalloc(sizeof(uint32_t), GFP_KERNEL);
+			if (!sess_id){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for sess_id\n");
+			}
 			if (copy_from_user(sess_id, (uint32_t *)arg, sizeof(sess_id)))
 			{
 				debug("CIOCFSESSION: copy_from_user failed (session ID)");
@@ -325,6 +357,10 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sgs[num_out++] = &sgs_ioctl_cmd;
 
 			crypt = kzalloc(sizeof(*crypt), GFP_KERNEL);
+			if (!crypt){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for crypt\n");
+			}
 			if (copy_from_user(crypt, (struct crypt_op *)arg, sizeof(crypt)))
 			{
 				debug("CIOCCRYPT: copy_from_user failed (crypto)");
@@ -335,6 +371,10 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sgs[num_out++] = &sgs_crypt_op;
 
 			src = kzalloc(sizeof(char)*crypt->len, GFP_KERNEL);
+			if (!src){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for src\n");
+			}
 			if (copy_from_user(src, crypt->src, sizeof(char)*crypt->len))
 			{
 				debug("CIOCCRYPT: copy_from_user failed (source)");
@@ -345,6 +385,10 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sgs[num_out++] = &sgs_src;
 
 			iv = kzalloc(BLOCK_SIZE * sizeof(char), GFP_KERNEL);
+			if (!iv){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for iv\n");
+			}
 			if (copy_from_user(iv, crypt->iv, BLOCK_SIZE * sizeof(char)))
 			{
 				debug("CIOCCRYPT: copy_from_user failed (iv)");
@@ -355,6 +399,10 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			sgs[num_out++] = &sgs_iv;
 
 			dst = kzalloc(crypt->len * sizeof(char), GFP_KERNEL);
+			if (!dst){
+				ret = -ENOMEM;
+				printk(KERN_ERR "Failed to allocate memory for dst\n");
+			}
 			sg_init_one(&sgs_dst, dst, sizeof(dst));
 			sgs[num_in++ + num_out] = &sgs_dst;
 

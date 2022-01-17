@@ -110,6 +110,8 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             *host_ret = ioctl(*crdev_fd, CIOCGSESSION, sess_op);
             if (*host_ret)
               perror("Crypto session init failed");
+
+            printf("Backend sent CIOCGSESSION command successfully");
             break;
           case VIRTIO_CRYPTODEV_IOCTL_CIOCFSESSION:
             DEBUG("Entering CIOCFSESSION");
@@ -118,6 +120,8 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             *host_ret = ioctl(*credv_fd, CIOCFSESSION, sess_id);
             if(*host_ret)
               perror("Ending crypto session failed");
+
+            printf("Backend sent CIOCFSESSION command succesfully");
             break;
           case VIRTIO_CRYPTODEV_IOCTL_CIOCCRYPT:
             DEBUG("Entering CIOCCRYPT");
@@ -133,6 +137,8 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             *host_ret = ioctl(*crypt_fd, CIOCCRYPT, crypt);
             if(*host_ret)
               perror("Error encrypting/decrypting from cryptodev module");
+
+            printf("Backend sent CIOCCRYPT command succesfully");
             break;
 
           default:
@@ -149,6 +155,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
     virtqueue_push(vq, elem, 0);
     virtio_notify(vdev, vq);
     g_free(elem);
+    DEBUG("BACKEND PUSHED TO FRONTEND SUCCESSFULLY");
 }
 
 static void virtio_cryptodev_realize(DeviceState *dev, Error **errp)
