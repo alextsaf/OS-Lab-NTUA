@@ -205,7 +205,8 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 	unsigned long arg)
 	{
 		long ret = 0;
-		int err, *host_fd, *host_return_val;
+		int err;
+		long *host_return_val;
 
 		struct crypto_open_file *crof = filp->private_data;
 		struct crypto_device *crdev = crof->crdev;
@@ -236,11 +237,11 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		}
 		*syscall_type = VIRTIO_CRYPTODEV_SYSCALL_IOCTL;
 
-		host_fd = kzalloc(sizeof(*host_fd), GFP_KERNEL);
-		if (!host_fd){
-			ret = -ENOMEM;
-			printk(KERN_ERR "Failed to allocate memory for host_fd\n");
-		}
+		 host_fd = kzalloc(sizeof(*host_fd), GFP_KERNEL);
+		 if (!host_fd){
+		 	ret = -ENOMEM;
+		 	printk(KERN_ERR "Failed to allocate memory for host_fd\n");
+		 }
 		*host_fd = crof->host_fd;
 
 		ioctl_cmd = kzalloc(sizeof(*ioctl_cmd), GFP_KERNEL);
@@ -361,7 +362,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 				ret = -ENOMEM;
 				printk(KERN_ERR "Failed to allocate memory for crypt\n");
 			}
-			if (copy_from_user(crypt, (struct crypt_op *)arg, sizeof(crypt)))
+			if (copy_from_user(crypt, (struct crypt_op *)arg, sizeof(*crypt)))
 			{
 				debug("CIOCCRYPT: copy_from_user failed (crypto)");
 				ret = -EFAULT;
@@ -389,6 +390,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 				ret = -ENOMEM;
 				printk(KERN_ERR "Failed to allocate memory for iv\n");
 			}
+
 			if (copy_from_user(iv, crypt->iv, BLOCK_SIZE * sizeof(char)))
 			{
 				debug("CIOCCRYPT: copy_from_user failed (iv)");
@@ -423,22 +425,23 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 		/**
 		* Wait for the host to process our data.
 		**/
-
-		/* ?? */
-		/* ?? Lock ?? */
 		if (down_interruptible(&crdev->lock)){
 			return -ERESTARTSYS;
 		}
+		debug("locked before sending to backend (ioctl)");
 		err = virtqueue_add_sgs(vq, sgs, num_out, num_in,
 			&sgs_syscall_type, GFP_ATOMIC);
+		debug("sent queue to backend (ioctl)");
 		virtqueue_kick(vq);
+		debug("informed backend for change in VQ (kick_ioctl)");
 		while (virtqueue_get_buf(vq, &len) == NULL)
 			/* do nothing */;
 
 		up(&crdev->lock);
-
+		debug("unlocked (ioctl)");
 		switch (cmd) {
 			case CIOCGSESSION:
+			debug("before copy_to_user in CIOCGSESSION ioctl");
 				if (copy_to_user((struct session_op*) arg, sess_op, sizeof(*sess_op))){
 					debug("CIOCGSESSION: copy_to_user failed (session)");
 					ret = -EFAULT;
@@ -455,7 +458,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 				break;
 
 			case CIOCCRYPT:
-				if (copy_to_user(((struct crypt_op *)arg)->dst, dst, crypt->len) {
+				if (copy_to_user(((struct crypt_op *)arg)->dst, dst, crypt->len)) {
 					debug("CIOCCRYPT: copy_to_user (dst)");
 					ret = -EFAULT;
 					goto fail;
@@ -465,6 +468,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			default: break;
 		}
 	fail:
+			debug("about to free memory");
 			kfree(crypt);
 			kfree(dst);
 			kfree(iv);
@@ -475,7 +479,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 			kfree(sess_key);
 			kfree(sess_id);
 			kfree(sess_op);
-			kfree(sess_key);
+
 
 			//DO NOT kfree(host_fd);!!!!!
 

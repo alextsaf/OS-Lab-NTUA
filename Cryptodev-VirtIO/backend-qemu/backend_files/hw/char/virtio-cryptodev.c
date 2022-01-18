@@ -53,8 +53,8 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
     VirtQueueElement *elem;
     unsigned int *syscall_type, *ioctl_cmd;
     int *crdev_fd;
-    unsigned char *key;
-    int *host_ret;
+    unsigned char *sess_key;
+    long *host_ret;
     struct session_op *sess_op;
     struct crypt_op *crypt;
     uint32_t *sess_id;
@@ -117,7 +117,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             DEBUG("Entering CIOCFSESSION");
             sess_id = elem->out_sg[3].iov_base;
             host_ret = elem->in_sg[0].iov_base;
-            *host_ret = ioctl(*credv_fd, CIOCFSESSION, sess_id);
+            *host_ret = ioctl(*crdev_fd, CIOCFSESSION, sess_id);
             if(*host_ret)
               perror("Ending crypto session failed");
 
@@ -134,7 +134,7 @@ static void vq_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             crypt->src = src;
             crypt->dst = dst;
             crypt->iv = iv;
-            *host_ret = ioctl(*crypt_fd, CIOCCRYPT, crypt);
+            *host_ret = ioctl(*crdev_fd, CIOCCRYPT, crypt);
             if(*host_ret)
               perror("Error encrypting/decrypting from cryptodev module");
 
