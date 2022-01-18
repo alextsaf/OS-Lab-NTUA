@@ -205,7 +205,7 @@ static long crypto_chrdev_ioctl(struct file *filp, unsigned int cmd,
 	unsigned long arg)
 	{
 		long ret = 0;
-		int err;
+		int err, *host_fd;
 		long *host_return_val;
 
 		struct crypto_open_file *crof = filp->private_data;
